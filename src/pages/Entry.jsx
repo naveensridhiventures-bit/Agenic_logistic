@@ -8,7 +8,7 @@ import { DateNav, Empty, Field, Icon, Num, rise, stagger } from '../components/u
 const blank = { id: null, customerId: '', qty: '', rate: '', paid: false, mode: 'Cash' }
 
 export default function Entry() {
-  const { data, date, upsert, remove, toast } = useApp()
+  const { data, date, upsert, remove, toast, setTab } = useApp()
   const { settings } = data
   const s = useMemo(() => dayStats(date, data), [data, date])
   const customers = data.customers.filter((c) => c.active !== false)
@@ -104,6 +104,24 @@ export default function Entry() {
         </div>
         <DateNav />
       </motion.div>
+
+      {customers.length === 0 && (
+        <motion.div variants={rise} className="preview solid">
+          <span>No customers yet. Import your hotels first.</span>
+          <button type="button" className="link" onClick={() => setTab('cust')}>
+            Go to Customers
+          </button>
+        </motion.div>
+      )}
+
+      {Number(settings.costPerKg) === 0 && (
+        <motion.div variants={rise} className="preview">
+          <span>Batter cost per kg is not set, so profit is overstated.</span>
+          <button type="button" className="link" onClick={() => setTab('set')}>
+            Set it in Settings
+          </button>
+        </motion.div>
+      )}
 
       {/* live result strip */}
       <motion.div variants={rise} className={cx('live', liveNet >= 0 ? 'pos' : 'neg')} layout>

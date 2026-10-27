@@ -52,7 +52,7 @@ function Splash() {
 function SyncBadge() {
   const { sync, syncError, pull } = useApp()
   const map = {
-    demo: ['Demo data', 'warn'],
+    demo: ['Not connected', 'warn'],
     syncing: ['Syncing…', 'info'],
     synced: ['Synced to Sheet', 'ok'],
     offline: ['Offline - will retry', 'bad']

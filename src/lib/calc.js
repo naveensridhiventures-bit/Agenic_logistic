@@ -2,9 +2,9 @@ import { addDays, diffDays, fmtDate, inr, sum, todayStr } from './util'
 
 export const DEFAULT_SETTINGS = {
   company: 'Agenic',
-  costPerKg: 55, // what one kg of batter costs you to make
-  defaultRate: 95, // default selling price per kg
-  driverPerDay: 700, // default driver salary pre-filled each day
+  costPerKg: 0, // what one kg of batter costs you to make - set in Settings
+  defaultRate: 40, // default selling price per kg
+  driverPerDay: 0, // default driver salary pre-filled each day
   ownerEmail: '',
   maxUnpaidDays: 3, // warn when a customer's oldest bill is this many days old
   warnPercent: 80 // "near limit" threshold (% of credit limit)

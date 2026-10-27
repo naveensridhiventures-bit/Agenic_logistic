@@ -1,7 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { buildReminder, computeDues, DEFAULT_SETTINGS } from './lib/calc'
 import * as api from './lib/api'
-import { seedData } from './lib/seed'
 import { sleep, todayStr, uid } from './lib/util'
 
 const Ctx = createContext(null)
@@ -27,7 +26,7 @@ function loadCache() {
   } catch {
     /* ignore */
   }
-  return live ? emptyData() : seedData()
+  return emptyData()
 }
 const loadQueue = () => {
   try {
@@ -131,6 +130,14 @@ export function AppProvider({ children }) {
       setSync('synced')
       setSyncError('')
     } catch (e) {
+      // Older deployed script without bulk support: fall back to one row at a time.
+      const op = queue.current[0]
+      if (op?.action === 'upsertMany' && /Unknown action/i.test(e.message || '')) {
+        queue.current.splice(0, 1, ...op.rows.map((row) => ({ action: 'upsert', sheet: op.sheet, row })))
+        saveQueue()
+        flushing.current = false
+        return flush()
+      }
       setSync('offline')
       setSyncError(e.message || 'Could not reach the backend')
     } finally {
@@ -183,9 +190,9 @@ export function AppProvider({ children }) {
     setData((d) => ({ ...d, settings: { ...d.settings, ...settings } }))
     enqueue({ action: 'saveSettings', settings })
   }
-  const resetDemo = () => {
-    localStorage.removeItem(CACHE)
-    location.reload()
+  const upsertMany = (sheet, rows) => {
+    setData((d) => ({ ...d, [sheet]: rows.reduce(upsertRow, d[sheet]) }))
+    enqueue({ action: 'upsertMany', sheet, rows })
   }
 
   const dues = useMemo(() => computeDues(data), [data])
@@ -243,7 +250,7 @@ export function AppProvider({ children }) {
     upsert,
     remove,
     saveSettings,
-    resetDemo,
+    upsertMany,
     sendReminder,
     pull
   }

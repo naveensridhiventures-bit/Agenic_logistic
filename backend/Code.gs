@@ -12,7 +12,7 @@ const COMPANY = 'Agenic';
 const REMIND_HOUR = 9; // daily automatic check runs around this hour (script time zone)
 
 const SCHEMA = {
-  customers: { tab: 'Customers', cols: ['id', 'name', 'area', 'phone', 'email', 'rate', 'creditLimit', 'maxDays', 'active'], text: ['id', 'phone'] },
+  customers: { tab: 'Customers', cols: ['id', 'name', 'area', 'phone', 'email', 'rate', 'creditLimit', 'maxDays', 'active', 'address', 'mapUrl'], text: ['id', 'phone'] },
   deliveries: { tab: 'Deliveries', cols: ['id', 'date', 'customerId', 'customerName', 'qty', 'rate', 'cost', 'amount', 'note'], text: ['id', 'date', 'customerId'] },
   costs: { tab: 'DayCosts', cols: ['id', 'date', 'driver', 'diesel', 'porter', 'other', 'porterBooked', 'note'], text: ['id', 'date'] },
   payments: { tab: 'Payments', cols: ['id', 'date', 'customerId', 'customerName', 'amount', 'mode', 'note'], text: ['id', 'date', 'customerId'] },
@@ -68,6 +68,7 @@ function doPost(e) {
     check_(req.key);
     switch (req.action) {
       case 'upsert': upsert_(req.sheet, req.row); break;
+      case 'upsertMany': upsertMany_(req.sheet, req.rows); break;
       case 'remove': remove_(req.sheet, req.id); break;
       case 'saveSettings': saveSettings_(req.settings); break;
       case 'sendReminder': sendReminder_(req.customerId, req.subject, req.body); break;
@@ -139,6 +140,25 @@ function upsert_(name, row) {
     const next = Math.max(s.sh.getLastRow() + 1, 2);
     s.def.text.forEach(function (c) { s.sh.getRange(next, s.def.cols.indexOf(c) + 1).setNumberFormat('@'); });
     s.sh.getRange(next, 1, 1, values.length).setValues([values]);
+  }
+}
+
+function upsertMany_(name, rows) {
+  const s = sheet_(name);
+  const last = s.sh.getLastRow();
+  const pos = {};
+  if (last >= 2) s.sh.getRange(2, 1, last - 1, 1).getValues().forEach(function (r, i) { pos[String(r[0])] = i + 2; });
+  const add = [];
+  rows.forEach(function (row) {
+    const values = s.def.cols.map(function (c) { return row[c] === undefined || row[c] === null ? '' : row[c]; });
+    const at = pos[String(row.id)];
+    if (at) s.sh.getRange(at, 1, 1, values.length).setValues([values]);
+    else add.push(values);
+  });
+  if (add.length) {
+    const start = Math.max(s.sh.getLastRow() + 1, 2);
+    s.def.text.forEach(function (c) { s.sh.getRange(start, s.def.cols.indexOf(c) + 1, add.length, 1).setNumberFormat('@'); });
+    s.sh.getRange(start, 1, add.length, s.def.cols.length).setValues(add);
   }
 }
 

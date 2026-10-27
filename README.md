@@ -10,7 +10,7 @@ npm run dev        # http://localhost:5173
 npm run build      # production build in dist/
 ```
 
-With no backend connected it runs on **demo data**, so you can try everything first.
+The app starts empty and is pre-pointed at the Agenic Google Sheet web app. Add customers with **Customers → Import** (CSV or paste from Excel/Sheets) or one by one.
 
 ## 2. Connect the Google Sheet (about 5 minutes)
 

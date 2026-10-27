@@ -5,7 +5,7 @@ import * as api from '../lib/api'
 import { Field, Icon, rise, stagger } from '../components/ui'
 
 export default function Settings() {
-  const { data, saveSettings, toast, live, sync, syncError, resetDemo, pull } = useApp()
+  const { data, saveSettings, toast, live, sync, syncError, pull } = useApp()
   const [s, setS] = useState({ ...data.settings })
   const [cfg, setCfg] = useState(api.getCfg())
   const [testing, setTesting] = useState(false)
@@ -86,8 +86,8 @@ export default function Settings() {
           <div className={`status-box ${live ? (sync === 'offline' ? 'bad' : 'ok') : 'warn'}`}>
             <i className="dot" />
             <div>
-              <b>{live ? (sync === 'offline' ? 'Backend not reachable' : 'Connected to your Google Sheet') : 'Running on demo data'}</b>
-              <small>{live ? syncError || 'Every change is saved to the sheet automatically.' : 'Nothing is saved to a sheet until you connect it.'}</small>
+              <b>{live ? (sync === 'offline' ? 'Backend not reachable' : 'Connected to your Google Sheet') : 'Not connected'}</b>
+              <small>{live ? syncError || 'Every change is saved to the sheet automatically.' : 'Nothing is saved to a sheet until you add the web app URL.'}</small>
             </div>
           </div>
           <Field label="Web app URL" hint="From Apps Script: Deploy → Web app">
@@ -107,11 +107,6 @@ export default function Settings() {
           {live && (
             <button className="btn ghost" onClick={pull}>
               <Icon name="cloud" size={16} /> Sync now
-            </button>
-          )}
-          {!live && (
-            <button className="btn ghost danger-text" onClick={() => confirm('Reset the demo data?') && resetDemo()}>
-              Reset demo data
             </button>
           )}
           <small className="muted">

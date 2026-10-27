@@ -2,16 +2,55 @@ import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useApp } from '../store'
 import { cx, fmtDate, inr, uid } from '../lib/util'
+import { customersFromRows, customersFromText, mapUrl, rowsFromXlsx, TEMPLATE } from '../lib/csv'
 import { Empty, Field, Icon, Modal, Num, rise, Ring, stagger, StatusChip, Tilt } from '../components/ui'
 
-const blank = { id: null, name: '', area: '', phone: '', email: '', rate: '', creditLimit: '', maxDays: '', active: true }
+const blank = { id: null, name: '', area: '', address: '', phone: '', email: '', rate: '', creditLimit: '', maxDays: '', active: true }
 
 export default function Customers() {
-  const { data, dues, upsert, sendReminder, toast } = useApp()
+  const { data, dues, upsert, upsertMany, sendReminder, toast } = useApp()
   const [q, setQ] = useState('')
   const [filter, setFilter] = useState('all')
   const [edit, setEdit] = useState(null)
   const [busy, setBusy] = useState({})
+  const [imp, setImp] = useState(null) // { text } while the import dialog is open
+  const parsed = imp
+    ? imp.sheet
+      ? customersFromRows(imp.sheet, { rate: data.settings.defaultRate })
+      : customersFromText(imp.text, { rate: data.settings.defaultRate })
+    : null
+
+  const readFile = async (file) => {
+    if (!file) return
+    try {
+      if (/\.xlsx$/i.test(file.name)) setImp({ text: '', sheet: await rowsFromXlsx(file), name: file.name })
+      else setImp({ text: await file.text(), name: file.name })
+    } catch (e) {
+      toast(`Could not read that file: ${e.message}`, 'bad')
+    }
+  }
+  const downloadTemplate = () => {
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(new Blob([TEMPLATE], { type: 'text/csv' }))
+    a.download = 'agenic-customers-template.csv'
+    a.click()
+    URL.revokeObjectURL(a.href)
+  }
+  const runImport = () => {
+    // match an existing customer by phone first (names can repeat), then by name
+    const byPhone = new Map(data.customers.filter((c) => c.phone).map((c) => [String(c.phone), c]))
+    const byName = new Map(data.customers.map((c) => [c.name.trim().toLowerCase(), c]))
+    let added = 0
+    let updated = 0
+    const rows = parsed.rows.map((r) => {
+      const hit = (r.phone && byPhone.get(r.phone)) || (!r.phone && byName.get(r.name.toLowerCase()))
+      hit ? updated++ : added++
+      return { ...r, id: hit?.id || uid() }
+    })
+    upsertMany('customers', rows)
+    toast(`Imported ${added} new, ${updated} updated`)
+    setImp(null)
+  }
 
   const rows = dues.filter((d) => {
     if (q && !`${d.customer.name} ${d.customer.area}`.toLowerCase().includes(q.toLowerCase())) return false
@@ -34,6 +73,8 @@ export default function Customers() {
       id: edit.id || uid(),
       name: edit.name.trim(),
       area: edit.area.trim(),
+      address: (edit.address || '').trim(),
+      mapUrl: mapUrl((edit.address || '').trim()),
       phone: edit.phone.trim(),
       email: edit.email.trim(),
       rate: Number(edit.rate),
@@ -54,9 +95,14 @@ export default function Customers() {
           <h2 className="h1">Customers</h2>
           <p className="muted">Credit limits, dues and reminders for your hotels.</p>
         </div>
-        <button className="btn primary" onClick={() => open(null)}>
-          <Icon name="plus" size={18} /> Add customer
-        </button>
+        <div className="row gap">
+          <button className="btn ghost" onClick={() => setImp({ text: '' })}>
+            <Icon name="download" size={18} /> Import
+          </button>
+          <button className="btn primary" onClick={() => open(null)}>
+            <Icon name="plus" size={18} /> Add customer
+          </button>
+        </div>
       </motion.div>
 
       <motion.div variants={rise} className="row gap wrap toolbar">
@@ -138,6 +184,16 @@ export default function Customers() {
                   <button className="btn ghost sm grow" disabled={d.outstanding <= 0 || busy[c.id]} onClick={() => remind(d)}>
                     <Icon name="mail" size={15} /> {busy[c.id] ? 'Sending…' : reminded ? 'Remind again' : 'Send reminder'}
                   </button>
+                  {c.mapUrl && (
+                    <a className="icon-btn" href={c.mapUrl} target="_blank" rel="noreferrer" aria-label="Open in Google Maps" title="Open in Google Maps">
+                      <Icon name="pin" size={16} />
+                    </a>
+                  )}
+                  {c.phone && (
+                    <a className="icon-btn" href={`tel:${c.phone}`} aria-label="Call" title={`Call ${c.phone}`}>
+                      <Icon name="phone" size={16} />
+                    </a>
+                  )}
                   <button className="icon-btn" onClick={() => open(c)} aria-label="Edit customer">
                     <Icon name="edit" size={16} />
                   </button>
@@ -148,8 +204,70 @@ export default function Customers() {
           })}
         </AnimatePresence>
       </motion.div>
-      {rows.length === 0 && <Empty icon="users" title="No customers match" text="Try another search or filter." />}
+      {data.customers.length === 0 ? (
+        <Empty icon="users" title="No customers yet" text="Import all your hotels at once from a CSV or Excel sheet, or add them one by one.">
+          <button className="btn primary" onClick={() => setImp({ text: '' })}>
+            <Icon name="download" size={18} /> Bulk import customers
+          </button>
+        </Empty>
+      ) : (
+        rows.length === 0 && <Empty icon="users" title="No customers match" text="Try another search or filter." />
+      )}
       {inactive.length > 0 && <p className="muted tiny">{inactive.length} inactive customer(s) hidden.</p>}
+
+      <Modal open={!!imp} onClose={() => setImp(null)} wide>
+        {imp && (
+          <div className="form">
+            <div className="row between">
+              <h3 className="h3">
+                <Icon name="download" size={18} /> Bulk import customers
+              </h3>
+              <button type="button" className="icon-btn" onClick={() => setImp(null)} aria-label="Close">
+                <Icon name="x" size={18} />
+              </button>
+            </div>
+            <p className="muted">
+              Upload an <b>Excel (.xlsx)</b> or CSV file, or paste cells copied from Excel / Google Sheets. First row = headers, e.g.{' '}
+              <b>Customer Name, Phone Number, Location</b> (also: area, email, rate, creditLimit, maxDays). A price in the name like “price 32” becomes the rate. Re-importing updates customers (matched by phone) instead of duplicating.
+            </p>
+            <div className="row gap wrap">
+              <label className="btn ghost sm">
+                Choose Excel / CSV file
+                <input type="file" accept=".xlsx,.csv,.txt,text/csv" hidden onChange={(e) => readFile(e.target.files?.[0])} />
+              </label>
+              <button type="button" className="btn ghost sm" onClick={downloadTemplate}>
+                Download template
+              </button>
+              {imp.name && <small className="muted">{imp.name}</small>}
+            </div>
+            <textarea
+              className="paste"
+              rows={6}
+              value={imp.text}
+              onChange={(e) => setImp({ text: e.target.value })}
+              disabled={!!imp.sheet}
+              placeholder={'name\tarea\tphone\temail\trate\tcreditLimit\tmaxDays'}
+            />
+            {(imp.text.trim() || imp.sheet) && (
+              <div className={cx('preview', parsed.rows.length ? '' : 'solid')}>
+                <span>
+                  <b>{parsed.rows.length}</b> customer{parsed.rows.length === 1 ? '' : 's'} ready
+                  {parsed.rows.length > 0 && ` · first: ${parsed.rows[0].name}`}
+                </span>
+                {parsed.errors.length > 0 && <span className="warn">{parsed.errors[0]}{parsed.errors.length > 1 ? ` (+${parsed.errors.length - 1} more)` : ''}</span>}
+              </div>
+            )}
+            <div className="modal-actions">
+              <button type="button" className="btn ghost" onClick={() => setImp(null)}>
+                Cancel
+              </button>
+              <button type="button" className="btn primary" disabled={!parsed?.rows.length} onClick={runImport}>
+                <Icon name="check" size={18} /> Import {parsed?.rows.length || ''}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       <Modal open={!!edit} onClose={() => setEdit(null)}>
         {edit && (
@@ -171,6 +289,9 @@ export default function Customers() {
                 <input inputMode="tel" value={edit.phone} onChange={(e) => setEdit({ ...edit, phone: e.target.value })} />
               </Field>
             </div>
+            <Field label="Address / location (for Google Maps)">
+              <input value={edit.address || ''} onChange={(e) => setEdit({ ...edit, address: e.target.value })} />
+            </Field>
             <Field label="Email (for payment reminders)">
               <input type="email" value={edit.email} onChange={(e) => setEdit({ ...edit, email: e.target.value })} />
             </Field>
