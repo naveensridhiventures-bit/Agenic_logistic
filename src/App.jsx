@@ -7,7 +7,7 @@ import Dashboard from './pages/Dashboard'
 import Entry from './pages/Entry'
 import Payments from './pages/Payments'
 import Customers from './pages/Customers'
-import Reports from './pages/Reports'
+import Orders from './pages/Orders'
 import Settings from './pages/Settings'
 import { cx } from './lib/util'
 
@@ -16,7 +16,7 @@ const TABS = [
   { id: 'entry', label: 'Daily Entry', icon: 'truck', page: Entry },
   { id: 'pay', label: 'Payments', icon: 'wallet', page: Payments },
   { id: 'cust', label: 'Customers', icon: 'users', page: Customers },
-  { id: 'rep', label: 'Reports', icon: 'chart', page: Reports },
+  { id: 'rep', label: 'Orders', icon: 'chart', page: Orders },
   { id: 'set', label: 'Settings', icon: 'gear', page: Settings }
 ]
 

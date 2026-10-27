@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useApp } from '../store'
-import { dayStats } from '../lib/calc'
+import { dayStats, deliveryPayStatus, PAY_CHIP, PAY_LABEL } from '../lib/calc'
 import { cx, inr, kgf, uid } from '../lib/util'
 import { DateNav, Empty, Field, Icon, Num, rise, stagger } from '../components/ui'
 
@@ -14,6 +14,8 @@ export default function Entry() {
   const customers = data.customers.filter((c) => c.active !== false)
   const todays = data.deliveries.filter((d) => d.date === date)
   const saved = data.costs.find((c) => c.date === date)
+  const pay = useMemo(() => deliveryPayStatus(data), [data])
+  const [busy, setBusy] = useState('')
 
   // ---------- delivery form ----------
   const [f, setF] = useState(blank)
@@ -93,6 +95,34 @@ export default function Entry() {
       note: c.note
     })
     toast(liveNet >= 0 ? `Saved - ${inr(liveNet)} profit for the day` : `Saved - ${inr(liveNet)} loss for the day`, liveNet >= 0 ? 'ok' : 'warn')
+  }
+
+  const removePorter = () => {
+    setC((p) => ({ ...p, porter: '', porterBooked: false }))
+    if (saved) upsert('costs', { ...saved, porter: 0, porterBooked: false })
+    toast('Porter removed for this day')
+  }
+  const deleteCosts = () => {
+    if (!confirm('Delete the driver / diesel / porter costs for this day?')) return
+    remove('costs', date)
+    toast('Day cost deleted')
+  }
+  const makePdf = async (share) => {
+    setBusy(share ? 'share' : 'pdf')
+    try {
+      const { buildReport, sharePdf } = await import('../lib/report')
+      const { doc, filename, summary } = await buildReport({ mode: 'day', anchor: date, data })
+      if (share) {
+        const r = await sharePdf(doc, filename, `Agenic daily report ${date}: ${inr(summary.net, true)} net, ${inr(summary.pending)} pending`)
+        if (r === 'downloaded') toast('Sharing not supported here - PDF downloaded instead')
+      } else {
+        doc.save(filename)
+        toast('Day report downloaded')
+      }
+    } catch (err) {
+      toast(`Could not create PDF: ${err.message}`, 'bad')
+    }
+    setBusy('')
   }
 
   return (
@@ -236,6 +266,7 @@ export default function Entry() {
                       </small>
                     </div>
                     <b>{inr(d.qty * d.rate)}</b>
+                    <span className={`chip ${PAY_CHIP[pay[d.id]?.status || 'pending']}`}>{PAY_LABEL[pay[d.id]?.status || 'pending']}</span>
                     <button className="icon-btn" onClick={() => edit(d)} aria-label="Edit">
                       <Icon name="edit" size={16} />
                     </button>
@@ -273,9 +304,18 @@ export default function Entry() {
             <AnimatePresence>
               {c.porterBooked && (
                 <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} style={{ overflow: 'hidden' }}>
-                  <Field label="Porter charge (₹)">
-                    <input type="number" inputMode="decimal" value={c.porter} onChange={(e) => setC({ ...c, porter: e.target.value })} placeholder="0" />
-                  </Field>
+                  <div className="row gap" style={{ alignItems: 'flex-end' }}>
+                    <div className="grow">
+                      <Field label="Porter charge (₹)">
+                        <input type="number" inputMode="decimal" value={c.porter} onChange={(e) => setC({ ...c, porter: e.target.value })} placeholder="0" />
+                      </Field>
+                    </div>
+                    {saved && n(saved.porter) > 0 && (
+                      <button type="button" className="icon-btn danger" onClick={removePorter} aria-label="Remove porter" title="Remove porter">
+                        <Icon name="trash" size={16} />
+                      </button>
+                    )}
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -298,12 +338,41 @@ export default function Entry() {
               </span>
             </div>
 
-            <button className="btn primary" onClick={saveCosts} disabled={!dirty}>
-              <Icon name="check" size={18} /> {saved ? (dirty ? 'Update day cost' : 'Saved') : 'Save day cost'}
-            </button>
+            <div className="row gap">
+              <button className="btn primary grow" onClick={saveCosts} disabled={!dirty}>
+                <Icon name="check" size={18} /> {saved ? (dirty ? 'Update day cost' : 'Saved') : 'Save day cost'}
+              </button>
+              {saved && (
+                <button className="btn ghost" onClick={deleteCosts} aria-label="Delete day cost">
+                  <Icon name="trash" size={16} /> Delete
+                </button>
+              )}
+            </div>
           </div>
         </motion.section>
       </div>
+
+      <motion.section variants={rise} className="card pad report-card">
+        <div className="row between wrap">
+          <div>
+            <h3 className="h3">
+              <Icon name="download" size={18} /> Day report for management
+            </h3>
+            <p className="muted">
+              PDF with kg delivered, orders and payment status, driver / diesel / porter expenses, profit or loss, and the pending customers list.
+            </p>
+          </div>
+          <div className="row gap wrap">
+            <button className="btn primary" onClick={() => makePdf(false)} disabled={!!busy || s.empty}>
+              <Icon name="download" size={18} /> {busy === 'pdf' ? 'Creating…' : 'Download PDF'}
+            </button>
+            <button className="btn ghost" onClick={() => makePdf(true)} disabled={!!busy || s.empty}>
+              <Icon name="mail" size={16} /> {busy === 'share' ? 'Preparing…' : 'Share'}
+            </button>
+          </div>
+        </div>
+        {s.empty && <p className="tiny">Add deliveries or costs for this day to enable the report.</p>}
+      </motion.section>
     </motion.div>
   )
 }

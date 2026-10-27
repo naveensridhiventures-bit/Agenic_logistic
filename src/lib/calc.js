@@ -1,4 +1,4 @@
-import { addDays, diffDays, fmtDate, inr, sum, todayStr } from './util'
+import { addDays, diffDays, fmtDate, inr, parse, sum, toStr, todayStr } from './util'
 
 export const DEFAULT_SETTINGS = {
   company: 'Agenic',
@@ -149,4 +149,96 @@ export function buildReminder(item, settings) {
     .filter((l, i, a) => !(l === '' && a[i - 1] === ''))
     .join('\n')
   return { subject, body }
+}
+
+/* ---------------- payment status per delivery + period reports ---------------- */
+
+/** Payments clear each customer's OLDEST bills first. Returns { [deliveryId]: {amount, paid, due, status} }. */
+export function deliveryPayStatus(data) {
+  const out = {}
+  const byC = {}
+  data.deliveries.forEach((d) => (byC[d.customerId] ||= []).push(d))
+  const paidBy = {}
+  data.payments.forEach((p) => (paidBy[p.customerId] = (paidBy[p.customerId] || 0) + (Number(p.amount) || 0)))
+  for (const [cid, ds] of Object.entries(byC)) {
+    ds.sort((a, b) => a.date.localeCompare(b.date) || String(a.id).localeCompare(String(b.id)))
+    let credit = paidBy[cid] || 0
+    for (const d of ds) {
+      const amount = d.qty * d.rate
+      const used = Math.min(credit, amount)
+      credit -= used
+      const due = amount - used
+      out[d.id] = { amount, paid: used, due, status: due <= 0.5 ? 'paid' : used > 0.5 ? 'part' : 'pending' }
+    }
+  }
+  return out
+}
+export const PAY_LABEL = { paid: 'Paid', part: 'Part paid', pending: 'Pending', none: '-' }
+export const PAY_CHIP = { paid: 'clear', part: 'warn', pending: 'breach', none: '' }
+
+export function periodRange(mode, anchor) {
+  if (mode === 'day') return { start: anchor, end: anchor }
+  const d = parse(anchor)
+  if (mode === 'week') {
+    const start = addDays(anchor, -((d.getDay() + 6) % 7)) // Monday
+    return { start, end: addDays(start, 6) }
+  }
+  return {
+    start: toStr(new Date(d.getFullYear(), d.getMonth(), 1)),
+    end: toStr(new Date(d.getFullYear(), d.getMonth() + 1, 0))
+  }
+}
+export function shiftPeriod(mode, anchor, n) {
+  if (mode === 'day') return addDays(anchor, n)
+  if (mode === 'week') return addDays(anchor, 7 * n)
+  const d = parse(anchor)
+  return toStr(new Date(d.getFullYear(), d.getMonth() + n, 1))
+}
+export function periodLabel(mode, start, end) {
+  if (mode === 'day') return fmtDate(start, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+  if (mode === 'month') return parse(start).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
+  return `${fmtDate(start, { day: 'numeric', month: 'short' })} - ${fmtDate(end, { day: 'numeric', month: 'short', year: 'numeric' })}`
+}
+
+/** One row per day that has entries, newest first (future days are skipped). */
+export function periodRows(start, end, data, pay) {
+  const rows = []
+  const last = end > todayStr() ? todayStr() : end
+  for (let d = last; d >= start; d = addDays(d, -1)) {
+    const s = dayStats(d, data)
+    if (s.empty) continue
+    const deliveries = data.deliveries
+      .filter((x) => x.date === d)
+      .map((x) => ({ ...x, pay: pay[x.id] || { amount: x.qty * x.rate, paid: 0, due: x.qty * x.rate, status: 'pending' } }))
+    const billed = sum(deliveries, (x) => x.pay.amount)
+    const paid = sum(deliveries, (x) => x.pay.paid)
+    const due = sum(deliveries, (x) => x.pay.due)
+    const status = !deliveries.length ? 'none' : due <= 0.5 ? 'paid' : paid > 0.5 ? 'part' : 'pending'
+    const cost = data.costs.find((c) => c.date === d)
+    rows.push({ ...s, deliveries, billed, paid, due, status, costNote: cost?.note || '' })
+  }
+  return rows
+}
+
+export function sumRows(rows) {
+  const t = (k) => sum(rows, (r) => r[k])
+  return {
+    days: rows.length,
+    orders: t('count'),
+    kg: t('kg'),
+    revenue: t('revenue'),
+    batter: t('batter'),
+    margin: t('margin'),
+    driver: t('driver'),
+    diesel: t('diesel'),
+    porter: t('porter'),
+    other: t('other'),
+    logistics: t('logistics'),
+    net: t('net'),
+    billed: t('billed'),
+    paid: t('paid'),
+    due: t('due'),
+    collected: t('collected'),
+    lossDays: rows.filter((r) => r.net < 0).length
+  }
 }

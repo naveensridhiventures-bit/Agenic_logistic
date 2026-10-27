@@ -45,3 +45,10 @@ Notes: Gmail allows about 100 emails a day for a normal account (1,500 for Works
 ## Sheet tabs
 
 `Customers`, `Deliveries`, `DayCosts`, `Payments`, `Settings`. You can view or edit them directly, and the app picks up changes when you press the sync badge.
+
+## Orders, reports and PDFs
+
+- **Daily Entry** → after entering deliveries and the day's driver / diesel / porter cost, press **Download PDF** (or **Share** on a phone, e.g. WhatsApp). Deliveries, day cost and porter can all be edited or deleted.
+- **Orders** tab → switch **Day / Week / Month**, move with the arrows, open any date to see each order's payment status, and download a **PDF report** or **CSV**.
+- Every PDF ends with the **pending customers** list (what each customer still owes, oldest bill, status) and sign-off lines for management. Amounts in PDFs print as "Rs." because the built-in PDF font has no rupee sign.
+- Payment status is worked out by clearing each customer's oldest bills first.
