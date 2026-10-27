@@ -1,0 +1,204 @@
+import { useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { useApp } from '../store'
+import { cx, fmtDate, inr, uid } from '../lib/util'
+import { Empty, Field, Icon, Modal, Num, rise, Ring, stagger, StatusChip, Tilt } from '../components/ui'
+
+const blank = { id: null, name: '', area: '', phone: '', email: '', rate: '', creditLimit: '', maxDays: '', active: true }
+
+export default function Customers() {
+  const { data, dues, upsert, sendReminder, toast } = useApp()
+  const [q, setQ] = useState('')
+  const [filter, setFilter] = useState('all')
+  const [edit, setEdit] = useState(null)
+  const [busy, setBusy] = useState({})
+
+  const rows = dues.filter((d) => {
+    if (q && !`${d.customer.name} ${d.customer.area}`.toLowerCase().includes(q.toLowerCase())) return false
+    if (filter === 'breach') return d.status === 'breach'
+    if (filter === 'due') return d.outstanding > 0
+    if (filter === 'clear') return d.outstanding <= 0
+    return true
+  })
+  const inactive = data.customers.filter((c) => c.active === false)
+
+  const remind = async (d) => {
+    setBusy((b) => ({ ...b, [d.customer.id]: true }))
+    await sendReminder(d)
+    setBusy((b) => ({ ...b, [d.customer.id]: false }))
+  }
+  const save = (e) => {
+    e.preventDefault()
+    if (!edit.name.trim() || !Number(edit.rate)) return toast('Name and rate are required', 'warn')
+    upsert('customers', {
+      id: edit.id || uid(),
+      name: edit.name.trim(),
+      area: edit.area.trim(),
+      phone: edit.phone.trim(),
+      email: edit.email.trim(),
+      rate: Number(edit.rate),
+      creditLimit: Number(edit.creditLimit) || 0,
+      maxDays: Number(edit.maxDays) || 0,
+      active: edit.active
+    })
+    toast(edit.id ? 'Customer updated' : 'Customer added')
+    setEdit(null)
+  }
+  const open = (c) =>
+    setEdit(c ? { ...blank, ...c, rate: c.rate, creditLimit: c.creditLimit || '', maxDays: c.maxDays || '' } : { ...blank, rate: data.settings.defaultRate, maxDays: data.settings.maxUnpaidDays })
+
+  return (
+    <motion.div className="stack" variants={stagger} initial="hidden" animate="show">
+      <motion.div variants={rise} className="row between wrap">
+        <div>
+          <h2 className="h1">Customers</h2>
+          <p className="muted">Credit limits, dues and reminders for your hotels.</p>
+        </div>
+        <button className="btn primary" onClick={() => open(null)}>
+          <Icon name="plus" size={18} /> Add customer
+        </button>
+      </motion.div>
+
+      <motion.div variants={rise} className="row gap wrap toolbar">
+        <label className="search">
+          <Icon name="search" size={18} />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search hotel or area" />
+        </label>
+        <div className="seg">
+          {[
+            ['all', 'All'],
+            ['breach', 'Over limit'],
+            ['due', 'Has dues'],
+            ['clear', 'Clear']
+          ].map(([k, l]) => (
+            <button key={k} className={cx(filter === k && 'on')} onClick={() => setFilter(k)}>
+              {filter === k && <motion.i layoutId="seg" className="seg-pill" />}
+              <span>{l}</span>
+            </button>
+          ))}
+        </div>
+      </motion.div>
+
+      <motion.div className="cards" variants={stagger}>
+        <AnimatePresence mode="popLayout">
+          {rows.map((d) => {
+            const c = d.customer
+            const tone = d.status === 'breach' ? 'bad' : d.status === 'warn' ? 'warn' : 'ok'
+            const reminded = data.reminders?.[c.id]
+            return (
+              <Tilt key={c.id} variants={rise} layout exit={{ opacity: 0, scale: 0.9 }} className={cx('ccard', d.status)} strength={5}>
+                {d.status === 'breach' && <i className="pulse-ring" />}
+                <div className="row between">
+                  <div className="row gap">
+                    <div className={cx('avatar', tone)}>{c.name[0]}</div>
+                    <div>
+                      <b className="cname">{c.name}</b>
+                      <small className="muted">{c.area || '—'} · {inr(c.rate)}/kg</small>
+                    </div>
+                  </div>
+                  <StatusChip status={d.status} />
+                </div>
+
+                <div className="cmid">
+                  <div>
+                    <small>Outstanding</small>
+                    <b className={cx('cbig', d.outstanding > 0 && tone)}>
+                      <Num value={d.outstanding} duration={0.9} />
+                    </b>
+                    <small className="muted">
+                      {d.outstanding > 0 ? `oldest bill ${fmtDate(d.oldest)} · ${d.daysUnpaid}d` : d.advance > 0 ? `advance ${inr(d.advance)}` : 'nothing pending'}
+                    </small>
+                  </div>
+                  {d.limit > 0 ? (
+                    <Ring value={d.usage} status={tone}>
+                      <b>{Math.round(d.usage * 100)}%</b>
+                      <small>of limit</small>
+                    </Ring>
+                  ) : (
+                    <div className="nolimit">No limit</div>
+                  )}
+                </div>
+
+                <div className="limits">
+                  <span>Limit {d.limit ? inr(d.limit) : '—'}</span>
+                  <span>Max {d.maxDays || '—'} days</span>
+                  <span>Billed {inr(d.billed)}</span>
+                </div>
+                {d.reasons.length > 0 && (
+                  <div className="reasons">
+                    {d.reasons.map((r) => (
+                      <p key={r}>
+                        <Icon name="alert" size={14} /> {r}
+                      </p>
+                    ))}
+                  </div>
+                )}
+
+                <div className="row gap">
+                  <button className="btn ghost sm grow" disabled={d.outstanding <= 0 || busy[c.id]} onClick={() => remind(d)}>
+                    <Icon name="mail" size={15} /> {busy[c.id] ? 'Sending…' : reminded ? 'Remind again' : 'Send reminder'}
+                  </button>
+                  <button className="icon-btn" onClick={() => open(c)} aria-label="Edit customer">
+                    <Icon name="edit" size={16} />
+                  </button>
+                </div>
+                {reminded && <small className="muted tiny">Last reminder {new Date(reminded).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</small>}
+              </Tilt>
+            )
+          })}
+        </AnimatePresence>
+      </motion.div>
+      {rows.length === 0 && <Empty icon="users" title="No customers match" text="Try another search or filter." />}
+      {inactive.length > 0 && <p className="muted tiny">{inactive.length} inactive customer(s) hidden.</p>}
+
+      <Modal open={!!edit} onClose={() => setEdit(null)}>
+        {edit && (
+          <form onSubmit={save} className="form">
+            <div className="row between">
+              <h3 className="h3">{edit.id ? 'Edit customer' : 'New customer'}</h3>
+              <button type="button" className="icon-btn" onClick={() => setEdit(null)} aria-label="Close">
+                <Icon name="x" size={18} />
+              </button>
+            </div>
+            <Field label="Hotel / business name">
+              <input autoFocus value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} />
+            </Field>
+            <div className="two">
+              <Field label="Area">
+                <input value={edit.area} onChange={(e) => setEdit({ ...edit, area: e.target.value })} />
+              </Field>
+              <Field label="Phone">
+                <input inputMode="tel" value={edit.phone} onChange={(e) => setEdit({ ...edit, phone: e.target.value })} />
+              </Field>
+            </div>
+            <Field label="Email (for payment reminders)">
+              <input type="email" value={edit.email} onChange={(e) => setEdit({ ...edit, email: e.target.value })} />
+            </Field>
+            <div className="three">
+              <Field label="Rate / kg (₹)">
+                <input type="number" inputMode="decimal" value={edit.rate} onChange={(e) => setEdit({ ...edit, rate: e.target.value })} />
+              </Field>
+              <Field label="Credit limit (₹)" hint="0 = no limit">
+                <input type="number" inputMode="decimal" value={edit.creditLimit} onChange={(e) => setEdit({ ...edit, creditLimit: e.target.value })} />
+              </Field>
+              <Field label="Max unpaid days" hint="oldest bill age">
+                <input type="number" inputMode="numeric" value={edit.maxDays} onChange={(e) => setEdit({ ...edit, maxDays: e.target.value })} />
+              </Field>
+            </div>
+            <label className="switch">
+              <input type="checkbox" checked={edit.active} onChange={(e) => setEdit({ ...edit, active: e.target.checked })} />
+              <i />
+              <span>Active customer</span>
+            </label>
+            <div className="modal-actions">
+              <button type="button" className="btn ghost" onClick={() => setEdit(null)}>Cancel</button>
+              <button type="submit" className="btn primary">
+                <Icon name="check" size={18} /> Save
+              </button>
+            </div>
+          </form>
+        )}
+      </Modal>
+    </motion.div>
+  )
+}

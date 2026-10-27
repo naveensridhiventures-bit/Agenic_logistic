@@ -1,0 +1,47 @@
+# Agenic Batter Ledger
+
+A React + Vite PWA for Agenic idli batter deliveries. For every day it shows **profit or loss** after batter cost, driver salary, diesel, porter and other expenses. It tracks which hotels have paid, warns when a customer crosses the credit limit, and emails reminders. Data lives in your **Google Sheet** through a small Apps Script.
+
+## 1. Run the app
+
+```bash
+npm install
+npm run dev        # http://localhost:5173
+npm run build      # production build in dist/
+```
+
+With no backend connected it runs on **demo data**, so you can try everything first.
+
+## 2. Connect the Google Sheet (about 5 minutes)
+
+1. Create a new Google Sheet, e.g. "Agenic Ledger".
+2. **Extensions → Apps Script**, delete the sample code and paste `backend/Code.gs`.
+3. Change `API_KEY` at the top to your own secret word.
+4. Choose the function **`setup`** and press **Run**. Approve the permissions (Sheets and Gmail send). It creates the tabs and a daily 9 AM reminder trigger.
+5. **Deploy → New deployment → Web app**. Set *Execute as: Me* and *Who has access: Anyone*. Copy the URL ending in `/exec`.
+6. In the app open **Settings → Google Sheet backend**, paste the URL and key, press **Test connection**, then **Save & connect**.
+7. Add your hotels in **Customers**, or type them straight into the `Customers` tab.
+
+Whenever you change `Code.gs`, use **Deploy → Manage deployments → Edit → New version**.
+
+## 3. Host it so staff can install it
+
+Upload `dist/` to Netlify, Vercel, Cloudflare Pages or Firebase Hosting (HTTPS is required for a PWA). Open the URL on a phone and choose **Install app / Add to Home Screen**. Optionally set `VITE_API_URL` and `VITE_API_KEY` in your host's environment so devices don't need the Settings step.
+
+## How it works
+
+| Idea | Rule |
+| --- | --- |
+| Day profit/loss | Sales − (kg × batter cost) − driver − diesel − porter − other |
+| Price differences | Each customer has a usual rate. Override it per delivery, e.g. ₹40 higher or lower, and the margin updates. |
+| Batter cost | Saved on each delivery, so changing it later doesn't rewrite old days. |
+| Paid or not | Payments clear the **oldest bill first**. Tick "paid on delivery" to record cash or UPI instantly. |
+| Limits | Per customer: **credit limit (₹)** and **max unpaid days**. Reaching either marks the customer *Over limit*. |
+| Warnings | Red banner, a popup when a customer newly crosses a limit, and a pulsing card. |
+| Emails | "Send reminder" or "Email all" from the popup. The Apps Script sends from your Gmail, copying your email. A daily trigger also emails customers over limit, plus a summary to you. |
+
+Notes: Gmail allows about 100 emails a day for a normal account (1,500 for Workspace). The API key is a simple shared secret. Don't share the web app URL publicly.
+
+## Sheet tabs
+
+`Customers`, `Deliveries`, `DayCosts`, `Payments`, `Settings`. You can view or edit them directly, and the app picks up changes when you press the sync badge.
