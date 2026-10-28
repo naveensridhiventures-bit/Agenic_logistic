@@ -87,7 +87,8 @@ export function routesForDate(date, data) {
   const cById = new Map(data.customers.map((c) => [c.id, c]))
   const drivers = data.drivers.filter((d) => d.active !== false).map((d) => ({ ...d, _base: baseOf(d, cById) }))
   const ids = new Set(drivers.map((d) => d.id))
-  const todays = data.deliveries.filter((d) => d.date === date).map((d) => stopOf(d, cById.get(d.customerId)))
+  const hired = new Set((data.trips || []).filter((t) => t.date === date).flatMap((t) => String(t.customerIds).split(',')))
+  const todays = data.deliveries.filter((d) => d.date === date && !(hired.has(d.customerId) && !d.driverId)).map((d) => stopOf(d, cById.get(d.customerId)))
   const routes = Object.fromEntries(drivers.map((d) => [d.id, []]))
   const unassigned = []
   for (const s of todays) (s.driverId && ids.has(s.driverId) ? routes[s.driverId] : unassigned).push(s)

@@ -485,3 +485,5 @@ tfoot td { font-weight: 800; border-top: 2px solid var(--stroke); }
 .pick:hover { transform: translateY(-1px); }
 .pick.on { background: rgba(124,92,255,.28); border-color: rgba(124,92,255,.7); }
 .btn.sm { padding: 8px 12px; font-size: 13px; }
+.by-row { display: grid; grid-template-columns: 1fr; gap: 10px; }
+@media (min-width: 560px) { .by-row { grid-template-columns: 1fr 1fr; } }

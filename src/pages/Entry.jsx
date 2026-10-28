@@ -6,7 +6,7 @@ import { cx, inr, kgf, todayStr, uid } from '../lib/util'
 import Trips from '../components/Trips'
 import { DateNav, Empty, Field, Icon, Num, rise, stagger } from '../components/ui'
 
-const blank = { id: null, customerId: '', qty: '', rate: '', profit: '', paid: false, mode: 'Cash' }
+const blank = { id: null, customerId: '', qty: '', rate: '', profit: '', paid: false, mode: 'Cash', by: 'driver', charge: '' }
 const r2 = (n) => Math.round(n * 100) / 100
 
 export default function Entry() {
@@ -39,6 +39,30 @@ export default function Entry() {
       const delta = (Number(v) || 0) - (Number(p.rate) || 0)
       return { ...p, rate: v, profit: p.profit === '' ? '' : r2((Number(p.profit) || 0) + delta) }
     })
+  const todaysTrips = data.trips.filter((t) => t.date === date)
+  const tripOf = (customerId) => todaysTrips.find((t) => t.customerIds.split(',').includes(customerId))
+  const detach = (customerId) => {
+    const t = tripOf(customerId)
+    if (!t) return
+    const ids = t.customerIds.split(',').filter((x) => x && x !== customerId)
+    if (ids.length) upsert('trips', { ...t, customerIds: ids.join(',') })
+    else remove('trips', t.id)
+  }
+  const applyBy = (customerId) => {
+    const cur = tripOf(customerId)
+    const want = f.by
+    if (cur && want === 'trip:' + cur.id) return
+    if (cur) detach(customerId)
+    if (want.startsWith('new:')) upsert('trips', { id: uid(), date, mode: want.slice(4), cost: Number(f.charge) || 0, customerIds: customerId, note: '' })
+    else if (want.startsWith('trip:')) {
+      const t = todaysTrips.find((x) => x.id === want.slice(5))
+      if (t) upsert('trips', { ...t, customerIds: [...t.customerIds.split(',').filter(Boolean), customerId].join(',') })
+    }
+  }
+  const delDelivery = (d) => {
+    remove('deliveries', d.id)
+    if (todays.filter((x) => x.customerId === d.customerId && x.id !== d.id).length === 0) detach(d.customerId)
+  }
   const addDelivery = (e) => {
     e.preventDefault()
     if (!cust || qty <= 0 || rate <= 0) return toast('Choose a customer, quantity and rate', 'warn')
@@ -54,6 +78,8 @@ export default function Entry() {
       note: ''
     }
     upsert('deliveries', row)
+    applyBy(cust.id)
+    if (f.by.startsWith('new:') && !(Number(f.charge) > 0)) toast(`${f.by.slice(4)} added with no charge yet - enter it under Hired vehicles`, 'warn')
     if (f.paid && !f.id)
       upsert('payments', {
         id: uid(),
@@ -66,10 +92,10 @@ export default function Entry() {
       })
     toast(f.id ? 'Delivery updated' : `Added ${kgf(qty)} for ${cust.name}${f.paid ? ' (paid)' : ''}`)
     setF(blank)
-    if (!f.id && data.drivers.some((x) => x.active !== false) && date >= todayStr()) setAssignFor(row.id)
+    if (!f.id && f.by === 'driver' && data.drivers.some((x) => x.active !== false) && date >= todayStr()) setAssignFor(row.id)
   }
   const edit = (d) =>
-    setF({ id: d.id, customerId: d.customerId, qty: d.qty, rate: d.rate, profit: r2(d.rate - unitCostOf(d, data)), paid: false, mode: 'Cash' })
+    setF({ id: d.id, customerId: d.customerId, qty: d.qty, rate: d.rate, profit: r2(d.rate - unitCostOf(d, data)), paid: false, mode: 'Cash', by: tripOf(d.customerId) ? 'trip:' + tripOf(d.customerId).id : 'driver', charge: '' })
 
   // ---------- day cost form ----------
   const initCost = () => ({
@@ -223,6 +249,27 @@ export default function Entry() {
               )}
             </AnimatePresence>
 
+            <div className="by-row">
+              <Field label="Delivered by" hint="Own driver, or a hired porter / auto / bike">
+                <select value={f.by} onChange={(e) => setF({ ...f, by: e.target.value })}>
+                  <option value="driver">Own driver</option>
+                  <option value="new:Porter">Porter (new booking)</option>
+                  <option value="new:Auto">Auto (new booking)</option>
+                  <option value="new:Bike">Bike (new booking)</option>
+                  {todaysTrips.map((t) => (
+                    <option key={t.id} value={'trip:' + t.id}>
+                      Same {t.mode} as {t.customerIds.split(',').map((id) => data.customers.find((c) => c.id === id)?.name).filter(Boolean).slice(0, 2).join(', ')}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              {f.by.startsWith('new:') && (
+                <Field label={`${f.by.slice(4)} charge (₹)`} hint="whole booking">
+                  <input type="number" inputMode="decimal" value={f.charge} onChange={(e) => setF({ ...f, charge: e.target.value })} placeholder="0" />
+                </Field>
+              )}
+            </div>
+
             {!f.id && (
               <div className="paid-row">
                 <label className="switch">
@@ -275,13 +322,17 @@ export default function Entry() {
                     </div>
                     <b>{inr(d.qty * d.rate)}</b>
                     <span className={`chip ${PAY_CHIP[pay[d.id]?.status || 'pending']}`}>{PAY_LABEL[pay[d.id]?.status || 'pending']}</span>
-                    <button type="button" className={cx('chip drv', drv ? 'clear' : 'warn')} onClick={() => setAssignFor(d.id)} title="Choose driver">
-                      {drv ? drv.name : 'Assign driver'}
-                    </button>
+                    {tripOf(d.customerId) ? (
+                      <span className="chip drv clear">{tripOf(d.customerId).mode}</span>
+                    ) : (
+                      <button type="button" className={cx('chip drv', drv ? 'clear' : 'warn')} onClick={() => setAssignFor(d.id)} title="Choose driver">
+                        {drv ? drv.name : 'Assign driver'}
+                      </button>
+                    )}
                     <button className="icon-btn" onClick={() => edit(d)} aria-label="Edit">
                       <Icon name="edit" size={16} />
                     </button>
-                    <button className="icon-btn danger" onClick={() => remove('deliveries', d.id)} aria-label="Delete">
+                    <button className="icon-btn danger" onClick={() => delDelivery(d)} aria-label="Delete">
                       <Icon name="trash" size={16} />
                     </button>
                   </motion.div>
