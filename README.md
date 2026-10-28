@@ -96,3 +96,7 @@ After updating `Code.gs`: paste it, run `setup` once (creates the Tracking tab a
 - Routes page now shows the **driver app link** banner on top (Copy, WhatsApp, QR, Drivers & PINs).
 - **Live status** has a summary strip: Total / Done / Kg / Bill / Collected / Pending, plus per-driver stop status, remarks and voice notes.
 - **Date-wise reports** tab: last 7/14/30 days, tap a day to open it in Live status; download or share the delivery report PDF (summary by date + every stop with status, time, payment, remark).
+
+## Customer ledgers (Tally style)
+- Customers page → **Customer ledgers**: customers listed highest pending first, tick any (or "Top 10 pending"), choose Day / Week / Month / Custom / All and download or share one PDF. Each customer gets an account ledger (opening balance b/f, sales as Debit, receipts as Credit, running balance, closing c/f); several customers also get a summary page.
+- The date-wise delivery report PDF no longer shows any payment figures (payments are recorded later in Payments and appear in the ledgers).

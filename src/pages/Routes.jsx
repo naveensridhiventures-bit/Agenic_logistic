@@ -216,7 +216,7 @@ export default function Routes() {
         <motion.div variants={rise}>{toggle}</motion.div>
         <motion.div variants={rise}>
           <h2 className="h1">Date-wise delivery reports</h2>
-          <p className="muted">Delivered or not, money collected and notes for every day. Tap a day to see each stop and play voice notes.</p>
+          <p className="muted">Delivered or not, kg, bill and notes for every day. Payments live in Payments and each customer's ledger. Tap a day to see each stop and play voice notes.</p>
         </motion.div>
         <DeliveryHistory onOpenDay={(d) => { setDate(d); setView('live') }} />
       </motion.div>

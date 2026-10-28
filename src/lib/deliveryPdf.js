@@ -2,6 +2,7 @@
 import { logRange } from './deliveryLog'
 import { fmtDate, fmtLong, sum, todayStr } from './util'
 
+// Payments are intentionally NOT shown here - they are recorded later in Payments and appear in customer ledgers.
 const rs = (n) => `Rs. ${Math.round(Number(n) || 0).toLocaleString('en-IN')}`
 const kg1 = (n) => `${Math.round((Number(n) || 0) * 10) / 10} kg`
 const COL = { brand: [91, 61, 245], ink: [17, 24, 39], mute: [107, 114, 128], pos: [16, 150, 100], neg: [214, 48, 73], warn: [200, 120, 10] }
@@ -57,20 +58,14 @@ export async function buildDeliveryPdf({ from, to, data }) {
     startY: y,
     margin: { left: M, right: M, top: M },
     theme: 'grid',
-    head: [['Date', 'Orders', 'Delivered', 'Not delivered', 'Kg', 'Bill', 'Cash', 'GPay', 'Collected', 'Pending (delivered, unpaid)']],
-    body: days.map((d) => [fmtDate(d.date, { weekday: 'short', day: 'numeric', month: 'short' }), d.orders, d.done, d.skipped || '-', kg1(d.kg), rs(d.bill), rs(d.cash), rs(d.gpay), rs(d.collected), d.pending > 0 ? rs(d.pending) : '-']),
-    foot: [['Total', T.orders, T.done, T.skipped || '-', kg1(T.kg), rs(T.bill), rs(T.cash), rs(T.gpay), rs(T.collected), rs(T.pending)]],
+    head: [['Date', 'Orders', 'Delivered', 'Not delivered', 'Kg', 'Bill']],
+    body: days.map((d) => [fmtDate(d.date, { weekday: 'short', day: 'numeric', month: 'short' }), d.orders, d.done, d.skipped || '-', kg1(d.kg), rs(d.bill)]),
+    foot: [['Total', T.orders, T.done, T.skipped || '-', kg1(T.kg), rs(T.bill)]],
     styles: { fontSize: 8.6, cellPadding: 2, lineColor: [225, 228, 238], lineWidth: 0.2, textColor: COL.ink },
     headStyles: { fillColor: COL.brand, textColor: 255 },
     footStyles: { fillColor: [243, 244, 250], textColor: COL.ink, fontStyle: 'bold' },
     alternateRowStyles: { fillColor: [250, 250, 253] },
-    columnStyles: Object.fromEntries([1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => [i, { halign: 'right' }])),
-    didParseCell: (h) => {
-      if (h.section === 'body' && h.column.index === 9 && h.cell.raw !== '-') {
-        h.cell.styles.textColor = COL.neg
-        h.cell.styles.fontStyle = 'bold'
-      }
-    }
+    columnStyles: Object.fromEntries([1, 2, 3, 4, 5].map((i) => [i, { halign: 'right' }])),
   })
 
   for (const d of days) {
@@ -83,12 +78,12 @@ export async function buildDeliveryPdf({ from, to, data }) {
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(9)
     doc.setTextColor(...COL.mute)
-    doc.text(`${d.done} of ${d.orders} delivered${d.skipped ? `, ${d.skipped} not delivered` : ''} | ${kg1(d.kg)} | Bill ${rs(d.bill)} | Collected ${rs(d.collected)} (Cash ${rs(d.cash)}, GPay ${rs(d.gpay)}) | Pending ${rs(d.pending)}`, M, y + 6)
+    doc.text(`${d.done} of ${d.orders} delivered${d.skipped ? `, ${d.skipped} not delivered` : ''} | ${kg1(d.kg)} | Bill ${rs(d.bill)}`, M, y + 6)
     autoTable(doc, {
       startY: y + 10,
       margin: { left: M, right: M, top: M },
       theme: 'grid',
-      head: [['Delivered by', 'Customer', 'Kg', 'Bill', 'Status', 'Time', 'Payment', 'Remark / voice note']],
+      head: [['Delivered by', 'Customer', 'Kg', 'Bill', 'Status', 'Time', 'Remark / voice note']],
       body: d.rows.map((r) => [
         r.by,
         r.name,
@@ -96,13 +91,12 @@ export async function buildDeliveryPdf({ from, to, data }) {
         rs(r.bill),
         STATUS[r.status] + (r.unlocked ? ' (unlocked early)' : ''),
         hhmm(r.doneAt),
-        r.status !== 'delivered' ? '-' : r.payMode === 'pending' || !r.payMode ? 'Pending' : `${r.payMode === 'gpay' ? 'GPay' : 'Cash'} ${rs(r.payAmount)}`,
         [r.remark, r.voiceId ? '[voice note recorded]' : ''].filter(Boolean).join(' ') || '-'
       ]),
       styles: { fontSize: 8.4, cellPadding: 1.9, lineColor: [225, 228, 238], lineWidth: 0.2, textColor: COL.ink, valign: 'middle' },
       headStyles: { fillColor: COL.brand, textColor: 255 },
       alternateRowStyles: { fillColor: [250, 250, 253] },
-      columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' }, 7: { cellWidth: 80 } },
+      columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' }, 6: { cellWidth: 95 } },
       didParseCell: (h) => {
         if (h.section !== 'body') return
         const raw = String(h.cell.raw)
@@ -110,7 +104,6 @@ export async function buildDeliveryPdf({ from, to, data }) {
           h.cell.styles.fontStyle = 'bold'
           h.cell.styles.textColor = raw.startsWith('Delivered') ? COL.pos : raw.startsWith('Not delivered') ? COL.neg : COL.warn
         }
-        if (h.column.index === 6) h.cell.styles.textColor = raw === 'Pending' ? COL.neg : raw === '-' ? COL.mute : COL.pos
       }
     })
   }

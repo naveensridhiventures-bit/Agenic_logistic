@@ -74,12 +74,6 @@ export default function DeliveryHistory({ onOpenDay }) {
               <span>
                 Bill <b>{inr(d.bill)}</b>
               </span>
-              <span className="pos">
-                Collected <b>{inr(d.collected)}</b>
-              </span>
-              <span className={d.pending > 0 ? 'neg' : ''}>
-                Pending <b>{inr(d.pending)}</b>
-              </span>
               {d.notes > 0 && <span className="muted">{d.notes} note{d.notes === 1 ? '' : 's'}</span>}
             </div>
             <Icon name="right" size={18} />

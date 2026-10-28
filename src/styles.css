@@ -535,3 +535,13 @@ tfoot td { font-weight: 800; border-top: 2px solid var(--stroke); }
 .hist-nums b { color: var(--text); }
 .hist-nums .pos b, .hist-nums .neg b { color: inherit; }
 @media (max-width: 760px) { .hist-row { grid-template-columns: 1fr 24px; } .hist-bar, .hist-nums { grid-column: 1 / 2; justify-content: flex-start; } .hist-row > svg { grid-row: 1; grid-column: 2; } }
+
+/* ---------- customer ledgers ---------- */
+.ledger-head { width: 100%; background: none; border: 0; color: inherit; text-align: left; cursor: pointer; padding: 0; }
+.ledger-list { max-height: 340px; overflow: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 4px; }
+.ledger-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 14px; border: 1px solid var(--stroke); background: rgba(255,255,255,.04); cursor: pointer; }
+.ledger-row.on { border-color: rgba(124,92,255,.8); background: rgba(124,92,255,.16); }
+.ledger-row input { width: 18px; height: 18px; flex: none; }
+.ledger-name { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.ledger-name small { color: var(--muted); }
+.ledger-row .neg { color: var(--neg); } .ledger-row .pos { color: var(--pos); }

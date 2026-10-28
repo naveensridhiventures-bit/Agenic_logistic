@@ -4,6 +4,7 @@ import { useApp } from '../store'
 import { cx, fmtDate, inr, uid } from '../lib/util'
 import { parseLocation } from '../lib/geo'
 import { customersFromRows, customersFromText, mapUrl, rowsFromXlsx, TEMPLATE } from '../lib/csv'
+import LedgerPanel from '../components/LedgerPanel'
 import { Empty, Field, Icon, Modal, Num, rise, Ring, stagger, StatusChip, Tilt } from '../components/ui'
 
 const blank = { id: null, name: '', area: '', address: '', profitPerKg: '', locText: '', origLoc: '', locSource: '', phone: '', email: '', rate: '', creditLimit: '', maxDays: '', active: true }
@@ -144,6 +145,7 @@ export default function Customers() {
         </div>
       </motion.div>
 
+      <LedgerPanel />
       <motion.div variants={rise} className="row gap wrap toolbar">
         <label className="search">
           <Icon name="search" size={18} />
