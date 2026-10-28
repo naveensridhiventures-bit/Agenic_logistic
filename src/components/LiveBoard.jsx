@@ -3,7 +3,8 @@ import { motion } from 'framer-motion'
 import { useApp } from '../store'
 import * as api from '../lib/api'
 import { routesForDate } from '../lib/routing'
-import { cx, inr, kgf } from '../lib/util'
+import { unlockCode, stopKey, returnKey } from '../lib/unlock'
+import { cx, inr, kgf, todayStr } from '../lib/util'
 import { Empty, Icon, rise, stagger } from './ui'
 
 const hhmm = (iso) => (iso && iso.length >= 16 ? iso.slice(11, 16) : '')
@@ -26,6 +27,22 @@ function Voice({ fileId }) {
   return (
     <button type="button" className="btn ghost sm" onClick={load} disabled={st.s === 'loading'}>
       <Icon name="bell" size={14} /> {st.s === 'loading' ? 'Loading…' : st.s === 'error' ? 'Retry voice note' : 'Play voice note'}
+    </button>
+  )
+}
+
+/** Reveal the 4-digit code the admin reads out when a driver calls to open a locked stop. */
+function UnlockCode({ k, label = 'Unlock code' }) {
+  const [code, setCode] = useState('')
+  if (code)
+    return (
+      <span className="chip warn live-code" title="Read this to the driver over the phone">
+        {label}: <b>{code}</b>
+      </span>
+    )
+  return (
+    <button type="button" className="btn ghost sm" onClick={async () => setCode(await unlockCode(k))}>
+      <Icon name="bell" size={14} /> {label}
     </button>
   )
 }
@@ -102,14 +119,20 @@ export default function LiveBoard() {
                         {s.t.payMode === 'cash' && <span className="chip clear">Cash {inr(s.t.payAmount)}</span>}
                         {s.t.payMode === 'gpay' && <span className="chip clear">GPay {inr(s.t.payAmount)}</span>}
                         {s.t.payMode === 'pending' && <span className="chip bad">Payment pending</span>}
+                        {s.t.unlocked === 'yes' && <span className="chip info">Unlocked early</span>}
                       </div>
                       {s.t.remark && <p className="live-remark">“{s.t.remark}”</p>}
                       {s.t.voiceId && <Voice fileId={s.t.voiceId} />}
+                      {!finished && i !== nextIdx && s.t.unlocked !== 'yes' && <UnlockCode k={stopKey(s.id)} />}
                     </div>
                   </li>
                 )
               })}
             </ul>
+            <div className="row between wrap live-ret">
+              <small className="muted">Driver wants to return to the pickup point early?</small>
+              <UnlockCode k={returnKey(d.id, todayStr())} label="Return code" />
+            </div>
           </motion.section>
         )
       })}

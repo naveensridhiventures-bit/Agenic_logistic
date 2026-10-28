@@ -8,6 +8,7 @@ export const DEFAULT_SETTINGS = {
   depotName: 'Koratturr', // pickup point every route starts from and returns to
   depotLat: 13.1143,
   depotLng: 80.185,
+  adminPhone: '', // office number drivers can call (shown in the driver app)
   mileageKmpl: 12, // truck km per litre
   dieselPrice: 95, // rupees per litre
   driverPerDay: 0, // default driver salary pre-filled each day

@@ -9,7 +9,7 @@
  */
 const API_KEY = 'change-me-to-your-secret'; // <- must match the key you enter in the app
 const COMPANY = 'Agenic';
-const CODE_VERSION = 'driver-app-v1'; // open <web app url>?action=version to check which code is live
+const CODE_VERSION = 'driver-app-v2'; // open <web app url>?action=version to check which code is live
 const REMIND_HOUR = 9; // daily automatic check runs around this hour (script time zone)
 
 const SCHEMA = {
@@ -19,7 +19,7 @@ const SCHEMA = {
   trips: { tab: 'Trips', cols: ['id', 'date', 'mode', 'cost', 'customerIds', 'note'], text: ['id', 'date', 'customerIds'] },
   payments: { tab: 'Payments', cols: ['id', 'date', 'customerId', 'customerName', 'amount', 'mode', 'note'], text: ['id', 'date', 'customerId'] },
   drivers: { tab: 'Drivers', cols: ['id', 'name', 'phone', 'vehicle', 'capacityKg', 'startAddress', 'startLat', 'startLng', 'stretch', 'active', 'baseRoute', 'pin'], text: ['id', 'phone', 'baseRoute', 'pin'] },
-  tracking: { tab: 'Tracking', cols: ['id', 'date', 'driverId', 'customerId', 'status', 'doneAt', 'remark', 'voiceId', 'payMode', 'payAmount', 'payAt', 'updatedAt'], text: ['id', 'date', 'driverId', 'customerId', 'voiceId', 'doneAt', 'payAt', 'updatedAt'] },
+  tracking: { tab: 'Tracking', cols: ['id', 'date', 'driverId', 'customerId', 'status', 'doneAt', 'remark', 'voiceId', 'payMode', 'payAmount', 'payAt', 'updatedAt', 'unlocked'], text: ['id', 'date', 'driverId', 'customerId', 'voiceId', 'doneAt', 'payAt', 'updatedAt', 'unlocked'] },
   settings: { tab: 'Settings', cols: ['key', 'value'], text: [] }
 };
 
@@ -118,6 +118,7 @@ function driverApi_(req) {
     case 'driverRoute': return driverRoute_(authDriver_(req), req.date);
     case 'driverUpdate': return driverUpdate_(authDriver_(req), req);
     case 'driverVoice': return driverVoice_(authDriver_(req), req);
+    case 'driverUnlock': return driverUnlock_(authDriver_(req), req);
     default: throw new Error('Unknown action: ' + req.action);
   }
 }
@@ -168,7 +169,7 @@ function driverRoute_(d, date) {
       address: c.address || '', lat: c.lat === '' ? null : c.lat, lng: c.lng === '' ? null : c.lng,
       qty: Number(x.qty) || 0, rate: Number(x.rate) || 0, bill: amt(x),
       due: { previous: Math.round(previous), today: Math.round(todayDue), total: Math.round(previous + todayDue) },
-      track: { status: t.status || 'pending', remark: t.remark || '', voiceId: t.voiceId || '', payMode: t.payMode || '', payAmount: Number(t.payAmount) || 0, doneAt: t.doneAt || '' }
+      track: { unlocked: String(t.unlocked) === 'yes', status: t.status || 'pending', remark: t.remark || '', voiceId: t.voiceId || '', payMode: t.payMode || '', payAmount: Number(t.payAmount) || 0, doneAt: t.doneAt || '' }
     };
   });
   const st = {};
@@ -176,6 +177,9 @@ function driverRoute_(d, date) {
   return {
     date: day, serverTime: nowIso_(),
     driver: { id: String(d.id), name: d.name, phone: d.phone, vehicle: d.vehicle },
+    office: { phone: String(st.adminPhone || '') },
+    stretch: String(d.stretch || ''),
+    returnUnlocked: String((tracking['ret-' + d.id + '-' + day] || {}).unlocked) === 'yes',
     depot: { name: st.depotName || 'Koratturr', lat: Number(st.depotLat) || 13.1143, lng: Number(st.depotLng) || 80.185 },
     stops: stops
   };
@@ -227,6 +231,40 @@ function driverUpdate_(d, req) {
     }
   }
   return { track: row };
+}
+
+// Admin gives the driver a 4-digit code (shown in the app's Live status) to open a stop out of order or the final return point.
+function unlockCode_(key) {
+  const sig = Utilities.computeHmacSha256Signature('unlock|' + key, API_KEY);
+  const b = sig.map(function (x) { return x & 255; });
+  const n = b[0] * 16777216 + b[1] * 65536 + b[2] * 256 + b[3];
+  return ('0000' + (n % 10000)).slice(-4);
+}
+
+function driverUnlock_(d, req) {
+  const cache = CacheService.getScriptCache();
+  const failKey = 'ufail_' + d.id;
+  const fails = Number(cache.get(failKey) || 0);
+  if (fails >= 5) throw new Error('Too many wrong codes. Call the office.');
+  const day = today_();
+  var key, rowId, customerId = '';
+  if (req.target === 'return') {
+    key = 'ret|' + d.id + '|' + day; rowId = 'ret-' + d.id + '-' + day;
+  } else {
+    const del = ownDelivery_(d, req.target);
+    key = 'del|' + del.id; rowId = String(del.id); customerId = String(del.customerId);
+  }
+  if (String(req.code || '').replace(/\D/g, '') !== unlockCode_(key)) {
+    cache.put(failKey, String(fails + 1), 600);
+    throw new Error('Wrong code. Call the office to get the right code.');
+  }
+  cache.remove(failKey);
+  const row = trackRow_(rowId);
+  row.date = day; row.driverId = String(d.id); row.customerId = customerId;
+  row.unlocked = 'yes'; row.updatedAt = nowIso_();
+  if (req.target === 'return') row.status = 'unlocked';
+  upsert_('tracking', row);
+  return { unlocked: true };
 }
 
 function voiceFolder_() {

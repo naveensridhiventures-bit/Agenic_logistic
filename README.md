@@ -83,3 +83,9 @@ After updating `Code.gs`: run `setup` once (adds the Drivers tab and new columns
 Every route starts at the pickup point (Settings → Pickup point, default Koratturr) and returns to it. Optimize builds a loop so the far run goes out one way and nearer hotels are served on the way back, and picks the direction that drops heavy loads first. Set truck mileage and diesel price in Settings to see litres and rupees per route and the saving when you optimize.
 
 After updating `Code.gs`: paste it, run `setup` once (creates the Tracking tab and asks for Google Drive permission), then Deploy → New version.
+
+## Unlock codes, route overview and office call
+
+- **Settings → Office phone** is shown in the driver app (Call office button).
+- Locked stops, and the final return to the pickup point, open with a **4-digit code**. The driver taps Unlock, sees the office number to call, and enters the code the admin reads out. The admin finds it in **Routes → Live status** (button *Unlock code* on each waiting stop, and *Return code* per driver). Five wrong codes lock the attempts for 10 minutes. Stops opened early are marked *Unlocked early*.
+- The driver's **Route** button shows the whole route without locks: stretch, a sketch map, every hotel name in order with its status, and QR codes / buttons that open the full route in Google Maps.

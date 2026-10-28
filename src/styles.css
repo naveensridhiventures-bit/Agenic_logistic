@@ -500,3 +500,5 @@ tfoot td { font-weight: 800; border-top: 2px solid var(--stroke); }
 .live-remark { margin: 0; font-size: 13px; color: var(--text); opacity: .9; font-style: italic; }
 .live-audio { width: 100%; height: 36px; }
 .seq.bad { background: var(--neg); color: #fff; }
+.live-code b { font-size: 18px; letter-spacing: .15em; margin-left: 4px; }
+.live-ret { padding-top: 10px; border-top: 1px dashed var(--stroke); }

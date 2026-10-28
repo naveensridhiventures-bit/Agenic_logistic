@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useDriver } from './useDriver'
 import { dpost, mapsTo } from './dapi'
 import { fmtDate, inr, kgf, todayStr } from '../lib/util'
+import { hasLL, mapsLinks } from '../lib/geo'
 
 const P = {
   nav: '<path d="M12 3l8 18-8-4-8 4z"/>',
@@ -19,7 +20,9 @@ const P = {
   phoneapp: '<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18h2"/>',
   clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2"/>',
   play: '<path d="M8 5l11 7-11 7z"/>',
-  alert: '<path d="M12 3L2 20h20z"/><path d="M12 10v5M12 17.5v.5"/>'
+  alert: '<path d="M12 3L2 20h20z"/><path d="M12 10v5M12 17.5v.5"/>',
+  map: '<path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/>',
+  key: '<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3M14 9l2 2"/>'
 }
 const Ic = ({ n, s = 22 }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" dangerouslySetInnerHTML={{ __html: P[n] }} />
@@ -364,12 +367,13 @@ function Ring({ done, total }) {
   )
 }
 
-function Current({ stop, total, onDeliver }) {
+function Current({ stop, total, onDeliver, early }) {
   return (
     <motion.section key={stop.id} className="d-cur" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
       <div className="d-cur-top">
         <span className="d-seq">
           Stop {stop.seq} of {total}
+          {early ? ' · unlocked' : ''}
         </span>
         <span className="d-kg">{kgf(stop.qty)}</span>
       </div>
@@ -408,10 +412,10 @@ function Current({ stop, total, onDeliver }) {
   )
 }
 
-function Row({ stop, locked, done, onEdit }) {
+function Row({ stop, locked, done, onEdit, onUnlock }) {
   const t = stop.track
   return (
-    <motion.li layout className={'d-row' + (locked ? ' lock' : '') + (done ? ' done' : '')} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+    <motion.li layout className={'d-row' + (locked ? ' lock tap' : '') + (done ? ' done' : '')} initial={{ opacity: 0 }} animate={{ opacity: 1 }} onClick={locked ? onUnlock : undefined}>
       <span className="d-n">{done ? <Ic n="check" s={16} /> : stop.seq}</span>
       <div className="d-row-main">
         <b>{stop.name}</b>
@@ -432,9 +436,215 @@ function Row({ stop, locked, done, onEdit }) {
           Edit
         </button>
       ) : (
-        <Ic n="lock" s={16} />
+        <span className="d-unl">
+          <Ic n="lock" s={16} /> Unlock
+        </span>
       )}
     </motion.li>
+  )
+}
+
+/* ------------------------------------------------------------ unlock sheet */
+function UnlockSheet({ target, office, onClose, onUnlock }) {
+  const [code, setCode] = useState('')
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
+  const go = async () => {
+    setBusy(true)
+    setErr('')
+    try {
+      await onUnlock(target.id, code)
+      vibrate(40)
+    } catch (e) {
+      setErr(e.message)
+      setCode('')
+      vibrate(80)
+    }
+    setBusy(false)
+  }
+  return (
+    <motion.div className="d-scrim" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}>
+      <motion.div className="d-sheet" initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 30, stiffness: 320 }} onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Unlock">
+        <div className="d-grab" />
+        <div className="d-sheet-head">
+          <div>
+            <small>{target.id === 'return' ? 'Final point is locked' : 'Stop is locked'}</small>
+            <b>{target.name}</b>
+          </div>
+          <button className="d-x" onClick={onClose} aria-label="Close">
+            <Ic n="x" s={20} />
+          </button>
+        </div>
+        <div className="d-scroll">
+          <p className="d-note">
+            {target.id === 'return' ? 'This opens after your last delivery.' : 'This stop opens after the one before it.'} To go out of order, call the office, tell them why, and type the 4-digit code they give you.
+          </p>
+          {office ? (
+            <a className="d-btn nav" href={`tel:${office}`}>
+              <Ic n="phone" s={20} /> Call office · {office}
+            </a>
+          ) : (
+            <p className="d-errtxt">The office number is not set. Ask the admin to add it in Settings.</p>
+          )}
+          <label className="d-field">
+            <span>Unlock code</span>
+            <input type="tel" inputMode="numeric" maxLength={4} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="0000" autoComplete="one-time-code" />
+          </label>
+          {err && <p className="d-errtxt">{err}</p>}
+        </div>
+        <div className="d-sheet-foot">
+          <button className="d-btn go" disabled={code.length !== 4 || busy} onClick={go}>
+            <Ic n="key" s={22} /> {busy ? 'Checking…' : 'Unlock'}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
+/* ---------------------------------------------------------- route overview */
+function Sketch({ depot, stops, state }) {
+  const pts = []
+  if (hasLL(depot)) pts.push({ lat: depot.lat, lng: depot.lng, s: true })
+  stops.forEach((s, i) => hasLL({ lat: Number(s.lat), lng: Number(s.lng) }) && pts.push({ lat: Number(s.lat), lng: Number(s.lng), n: i + 1, st: state(s) }))
+  if (pts.length < 2) return null
+  const lat0 = pts.reduce((a, p) => a + p.lat, 0) / pts.length
+  const kx = Math.cos((lat0 * Math.PI) / 180)
+  const X = pts.map((p) => p.lng * kx)
+  const Y = pts.map((p) => -p.lat)
+  const [minX, maxX, minY, maxY] = [Math.min(...X), Math.max(...X), Math.min(...Y), Math.max(...Y)]
+  const W = 340
+  const H = 230
+  const pad = 26
+  const sc = Math.min((W - 2 * pad) / (maxX - minX || 1e-6), (H - 2 * pad) / (maxY - minY || 1e-6))
+  const ox = pad + (W - 2 * pad - (maxX - minX) * sc) / 2
+  const oy = pad + (H - 2 * pad - (maxY - minY) * sc) / 2
+  const P = pts.map((p, i) => ({ ...p, x: ox + (X[i] - minX) * sc, y: oy + (Y[i] - minY) * sc }))
+  const path = [...P, P[0]].map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
+  const col = { done: '#1fd68f', now: '#ffb547', open: '#3d8bff', locked: '#6b7694' }
+  return (
+    <svg className="d-sketch" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Route sketch">
+      <path d={path} fill="none" stroke="#7c5cff" strokeWidth="2" strokeDasharray="5 4" opacity=".8" />
+      {P.map((p, i) => (
+        <g key={i}>
+          <circle cx={p.x} cy={p.y} r={p.s ? 11 : 10} fill={p.s ? '#1fd68f' : col[p.st] || '#6b7694'} stroke="#0b1226" strokeWidth="2" />
+          <text x={p.x} y={p.y + 4} textAnchor="middle" fontSize="11" fontWeight="800" fill="#06101f">
+            {p.s ? 'S' : p.n}
+          </text>
+        </g>
+      ))}
+    </svg>
+  )
+}
+
+function Overview({ route, stops, depot, office, stretch, unlockedReturn, cur, onClose, onUnlock }) {
+  const [qrs, setQrs] = useState([])
+  const links = useMemo(() => mapsLinks(hasLL(depot) ? depot : null, stops.map((s) => ({ ...s, lat: s.lat === '' || s.lat == null ? null : Number(s.lat), lng: s.lng === '' || s.lng == null ? null : Number(s.lng) }))), [stops, depot])
+  useEffect(() => {
+    let alive = true
+    import('qrcode').then(async (QR) => {
+      const imgs = []
+      for (const l of links) imgs.push({ ...l, img: await QR.toDataURL(l.url, { margin: 1, width: 360, errorCorrectionLevel: 'L' }) })
+      if (alive) setQrs(imgs)
+    })
+    return () => {
+      alive = false
+    }
+  }, [links])
+  const stateOf = (s) => (isDone(s) ? 'done' : cur && s.id === cur.id ? 'now' : s.track.unlocked ? 'open' : 'locked')
+  const areas = [...new Set(stops.map((s) => s.area).filter(Boolean))]
+  const label = { done: 'Done', now: 'Now', open: 'Unlocked', locked: 'Locked' }
+  return (
+    <motion.div className="d-scrim" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}>
+      <motion.div className="d-sheet tall" initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 30, stiffness: 320 }} onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Today's route">
+        <div className="d-grab" />
+        <div className="d-sheet-head">
+          <div>
+            <small>Starts and ends at {depot?.name || 'pickup point'}</small>
+            <b>Today's route</b>
+          </div>
+          <button className="d-x" onClick={onClose} aria-label="Close">
+            <Ic n="x" s={20} />
+          </button>
+        </div>
+        <div className="d-scroll">
+          {(stretch || areas.length > 0) && (
+            <div className="d-stretch">
+              <small>Your stretch</small>
+              <b>{stretch || areas.join(' › ')}</b>
+              {stretch && areas.length > 0 && <span>{areas.join(' › ')}</span>}
+            </div>
+          )}
+          <Sketch depot={depot} stops={stops} state={stateOf} />
+          <ul className="d-ov">
+            <li>
+              <span className="d-n start">S</span>
+              <div className="d-row-main">
+                <b>{depot?.name || 'Pickup point'}</b>
+                <small>Start</small>
+              </div>
+            </li>
+            {stops.map((s) => {
+              const st = stateOf(s)
+              return (
+                <li key={s.id} className={'st-' + st}>
+                  <span className="d-n">{st === 'done' ? <Ic n="check" s={15} /> : s.seq}</span>
+                  <div className="d-row-main">
+                    <b>{s.name}</b>
+                    <small>
+                      {s.area || 'Area not set'} · {kgf(s.qty)}
+                    </small>
+                  </div>
+                  <span className={'d-tag ' + st}>{label[st]}</span>
+                  {st === 'locked' && (
+                    <button className="d-edit" onClick={() => onUnlock({ id: s.id, name: s.name })}>
+                      Unlock
+                    </button>
+                  )}
+                </li>
+              )
+            })}
+            <li className={'st-' + (unlockedReturn ? 'open' : 'locked')}>
+              <span className="d-n start">
+                <Ic n="home" s={15} />
+              </span>
+              <div className="d-row-main">
+                <b>Return to {depot?.name || 'pickup point'}</b>
+                <small>Final point</small>
+              </div>
+              {!unlockedReturn && (
+                <button className="d-edit" onClick={() => onUnlock({ id: 'return', name: `Return to ${depot?.name || 'pickup point'}` })}>
+                  Unlock
+                </button>
+              )}
+            </li>
+          </ul>
+
+          {links.length > 0 && (
+            <div className="d-qr">
+              <h4>Whole route in Google Maps</h4>
+              <p className="d-note">Tap to open, or scan the code with another phone. Each link covers up to 9 stops in order.</p>
+              <div className="d-qr-grid">
+                {links.map((l, i) => (
+                  <div key={i} className="d-qr-item">
+                    {qrs[i]?.img ? <img src={qrs[i].img} alt={`Route QR ${i + 1}`} /> : <div className="d-qr-ph" />}
+                    <a className="d-btn nav" href={l.url} target="_blank" rel="noopener noreferrer">
+                      <Ic n="nav" s={18} /> Stops {l.from}-{l.to}
+                      {l.home ? ' + return' : ''}
+                    </a>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {office && (
+            <a className="d-btn call" href={`tel:${office}`}>
+              <Ic n="phone" s={20} /> Call office · {office}
+            </a>
+          )}
+        </div>
+      </motion.div>
+    </motion.div>
   )
 }
 
@@ -443,6 +653,8 @@ export default function DriverApp() {
   const dv = useDriver()
   const { session, route, stops, online, queueLen, error, setError, loading } = dv
   const [sheet, setSheet] = useState(null)
+  const [unlockFor, setUnlockFor] = useState(null)
+  const [overview, setOverview] = useState(false)
   const [toast, setToast] = useState('')
   const [showDone, setShowDone] = useState(false)
   const tt = useRef(null)
@@ -460,7 +672,9 @@ export default function DriverApp() {
 
   const cur = stops.find((s) => !isDone(s))
   const done = stops.filter(isDone)
-  const upcoming = cur ? stops.filter((s) => !isDone(s) && s.id !== cur.id) : []
+  const open = stops.filter((s) => !isDone(s) && cur && (s.id === cur.id || s.track.unlocked))
+  const upcoming = cur ? stops.filter((s) => !isDone(s) && !open.some((o) => o.id === s.id)) : []
+  const office = route?.office?.phone || ''
   const stat = useMemo(() => {
     const left = stops.filter((s) => !isDone(s))
     const sum = (a, f) => a.reduce((x, s) => x + f(s), 0)
@@ -506,6 +720,14 @@ export default function DriverApp() {
             <i /> {!online ? 'Offline' : queueLen ? `Sending ${queueLen}…` : 'Live'}
           </span>
           <div className="d-icons">
+            <button onClick={() => setOverview(true)} aria-label="Route overview" className="hl">
+              <Ic n="map" s={20} />
+            </button>
+            {office && (
+              <a href={`tel:${office}`} className="d-ib" aria-label="Call office">
+                <Ic n="phone" s={20} />
+              </a>
+            )}
             <button onClick={dv.refresh} className={loading ? 'spin' : ''} aria-label="Refresh">
               <Ic n="refresh" s={20} />
             </button>
@@ -551,7 +773,9 @@ export default function DriverApp() {
             </div>
           </section>
 
-          {cur && <Current stop={cur} total={stops.length} onDeliver={() => setSheet(cur.id)} />}
+          {open.map((s) => (
+            <Current key={s.id} stop={s} total={stops.length} early={s.id !== cur.id} onDeliver={() => setSheet(s.id)} />
+          ))}
 
           {!cur && (
             <motion.section className="d-finish" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}>
@@ -581,12 +805,18 @@ export default function DriverApp() {
               <h3 className="d-h">Up next</h3>
               <ul className="d-list">
                 {upcoming.map((s) => (
-                  <Row key={s.id} stop={s} locked />
+                  <Row key={s.id} stop={s} locked onUnlock={() => setUnlockFor({ id: s.id, name: s.name })} />
                 ))}
               </ul>
-              <a className="d-return" href={depotUrl} target="_blank" rel="noopener noreferrer">
-                <Ic n="home" s={18} /> Last: return to {depot?.name || 'pickup point'}
-              </a>
+              {dv.returnUnlocked ? (
+                <a className="d-return" href={depotUrl} target="_blank" rel="noopener noreferrer">
+                  <Ic n="home" s={18} /> Return to {depot?.name || 'pickup point'} · unlocked
+                </a>
+              ) : (
+                <button className="d-return" onClick={() => setUnlockFor({ id: 'return', name: `Return to ${depot?.name || 'pickup point'}` })}>
+                  <Ic n="lock" s={18} /> Last: return to {depot?.name || 'pickup point'} · Unlock
+                </button>
+              )}
             </>
           )}
 
@@ -610,6 +840,26 @@ export default function DriverApp() {
       <AnimatePresence>
         {sheet && stops.find((s) => s.id === sheet) && (
           <CollectSheet key={sheet} stop={stops.find((s) => s.id === sheet)} onClose={() => setSheet(null)} onSave={(v) => save(stops.find((s) => s.id === sheet), v)} onSkip={(v) => skip(stops.find((s) => s.id === sheet), v)} />
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {overview && (
+          <Overview key="ov" route={route} stops={stops} depot={depot} office={office} stretch={route?.stretch} unlockedReturn={dv.returnUnlocked || !cur} cur={cur} onClose={() => setOverview(false)} onUnlock={(t) => setUnlockFor(t)} />
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {unlockFor && (
+          <UnlockSheet
+            key="unl"
+            target={unlockFor}
+            office={office}
+            onClose={() => setUnlockFor(null)}
+            onUnlock={async (id, code) => {
+              await dv.unlock(id, code)
+              setUnlockFor(null)
+              say('Unlocked')
+            }}
+          />
         )}
       </AnimatePresence>
       <AnimatePresence>

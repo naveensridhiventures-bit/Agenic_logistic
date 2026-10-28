@@ -120,6 +120,15 @@ export function useDriver() {
     if (queue.current.length === 0 && sess.current) refresh()
   }, [logout, refresh])
 
+  /** Open a locked stop (or the final return point) with the code the office gives over the phone. */
+  const unlock = async (target, code) => {
+    const s = sess.current
+    await dpost('driverUnlock', { driverId: s.driver.id, token: s.token, target, code })
+    if (target === 'return') patchOverlay('__return', { unlocked: true })
+    else patchOverlay(target, { unlocked: true })
+    refresh()
+  }
+
   const patchOverlay = (deliveryId, p) =>
     setOverlay((o) => {
       const n = { ...o, [deliveryId]: { ...(o[deliveryId] || {}), ...p } }
@@ -178,5 +187,6 @@ export function useDriver() {
     () => (route?.stops || []).map((s) => ({ ...s, track: { ...s.track, ...(overlay[s.id] || {}) } })),
     [route, overlay]
   )
-  return { session, route, stops, online, queueLen, error, setError, loading, login, logout, refresh, act, sendVoice }
+  const returnUnlocked = !!(route?.returnUnlocked || overlay.__return?.unlocked)
+  return { unlock, returnUnlocked, session, route, stops, online, queueLen, error, setError, loading, login, logout, refresh, act, sendVoice }
 }

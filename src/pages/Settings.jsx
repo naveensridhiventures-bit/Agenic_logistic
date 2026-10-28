@@ -81,6 +81,9 @@ export default function Settings() {
           <Field label="Pickup point (every route starts and returns here)" hint={`Name, Google Maps link, lat,lng or plus code. Saved at ${Number(data.settings.depotLat).toFixed(4)}, ${Number(data.settings.depotLng).toFixed(4)}`}>
             <input value={s.depotName} onChange={(e) => set('depotName', e.target.value)} placeholder="Koratturr" />
           </Field>
+          <Field label="Office phone (drivers call this to get unlock codes)" hint="Shown in the driver app">
+            <input type="tel" inputMode="tel" value={s.adminPhone || ''} onChange={(e) => set('adminPhone', e.target.value)} placeholder="98xxxxxxxx" />
+          </Field>
           <div className="two">
             <Field label="Truck mileage (km per litre)" hint="Used to estimate diesel for each route">
               <input type="number" inputMode="decimal" value={s.mileageKmpl} onChange={(e) => set('mileageKmpl', e.target.value)} />
