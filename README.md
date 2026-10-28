@@ -69,3 +69,17 @@ After updating `Code.gs`: run `setup` once (adds the Drivers tab and new columns
 **Regular route:** in Drivers → edit, paste the route list he drives now (kg is ignored). New orders are suggested by how far they take him off that route; hotels already on it go to him automatically, in his order.
 
 **Hired vehicles (porter / auto / bike):** in Daily Entry → Delivery cost, press *Add vehicle*, choose the vehicle, enter its charge and tap the hotels that went in it. The management PDF lists each trip with hotels, kg, charge and cost per kg, plus total delivery expense ÷ total kg. Run `setup` once to create the new `Trips` tab.
+
+## Driver app (phone)
+
+- Open `https://YOUR-SITE/?driver=1` on the driver's phone and choose *Add to Home screen*. The link is also shown in **Routes → Drivers**.
+- Admin sets a **4-digit PIN** for each driver (Routes → Drivers → edit). The driver picks his name and enters the PIN (5 wrong tries lock that driver for 10 minutes). The driver app never receives the admin key, profit or other customers.
+- Driver sees only his own route in order, one stop at a time: Navigate, Call, amount to collect (today plus previous pending), then **Delivered**, payment **Cash / GPay / Pending**, optional remark and voice note. Only then does the next stop unlock. At the end: return to the pickup point.
+- It works offline: updates are saved on the phone and sent when the network is back.
+- Money collected becomes a normal payment in the ledger. **Routes → Live status** shows each stop's state, payment, remark and a voice-note player. Voice notes are stored in a private Google Drive folder created by the script.
+
+## Diesel-saving routes
+
+Every route starts at the pickup point (Settings → Pickup point, default Koratturr) and returns to it. Optimize builds a loop so the far run goes out one way and nearer hotels are served on the way back, and picks the direction that drops heavy loads first. Set truck mileage and diesel price in Settings to see litres and rupees per route and the saving when you optimize.
+
+After updating `Code.gs`: paste it, run `setup` once (creates the Tracking tab and asks for Google Drive permission), then Deploy → New version.

@@ -487,3 +487,16 @@ tfoot td { font-weight: 800; border-top: 2px solid var(--stroke); }
 .btn.sm { padding: 8px 12px; font-size: 13px; }
 .by-row { display: grid; grid-template-columns: 1fr; gap: 10px; }
 @media (min-width: 560px) { .by-row { grid-template-columns: 1fr 1fr; } }
+
+/* ---------- live status ---------- */
+.live-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 18px; align-items: start; }
+.live-card { display: flex; flex-direction: column; gap: 12px; }
+.live-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.live-row { display: flex; gap: 10px; padding: 10px; border-radius: 16px; background: rgba(255,255,255,.04); border: 1px solid var(--stroke); }
+.live-row.done { border-color: rgba(46,229,157,.25); }
+.live-row.now { border-color: rgba(255,181,71,.55); background: rgba(255,181,71,.08); }
+.live-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.live-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.live-remark { margin: 0; font-size: 13px; color: var(--text); opacity: .9; font-style: italic; }
+.live-audio { width: 100%; height: 36px; }
+.seq.bad { background: var(--neg); color: #fff; }

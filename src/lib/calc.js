@@ -5,6 +5,11 @@ export const DEFAULT_SETTINGS = {
   costPerKg: 0, // what one kg of batter costs you to make - set in Settings
   defaultRate: 40, // default selling price per kg
   defaultProfitPerKg: 0, // your profit per kg when a customer has none set
+  depotName: 'Koratturr', // pickup point every route starts from and returns to
+  depotLat: 13.1143,
+  depotLng: 80.185,
+  mileageKmpl: 12, // truck km per litre
+  dieselPrice: 95, // rupees per litre
   driverPerDay: 0, // default driver salary pre-filled each day
   ownerEmail: '',
   maxUnpaidDays: 3, // warn when a customer's oldest bill is this many days old

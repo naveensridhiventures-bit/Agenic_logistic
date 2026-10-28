@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useApp } from '../store'
 import * as api from '../lib/api'
+import { nominatim, parseLocation } from '../lib/geo'
 import { Field, Icon, rise, stagger } from '../components/ui'
 
 export default function Settings() {
@@ -11,13 +12,29 @@ export default function Settings() {
   const [testing, setTesting] = useState(false)
   const set = (k, v) => setS((p) => ({ ...p, [k]: v }))
 
-  const save = (e) => {
+  const save = async (e) => {
     e.preventDefault()
+    let pickup = {}
+    const txt = String(s.depotName || '').trim()
+    const pl = parseLocation(txt)
+    if (pl) pickup = { depotLat: pl.lat, depotLng: pl.lng, depotName: data.settings.depotName }
+    else if (txt && txt !== data.settings.depotName) {
+      try {
+        const g = await nominatim(`${txt}, Chennai, Tamil Nadu`)
+        if (g) pickup = { depotLat: g.lat, depotLng: g.lng }
+        else toast('Pickup point not found on the map - paste a Google Maps link or lat,lng. Kept the old location.', 'warn')
+      } catch {
+        toast('Could not look up the pickup point (offline?). Paste lat,lng instead. Kept the old location.', 'warn')
+      }
+    }
     saveSettings({
       ...s,
       defaultProfitPerKg: Number(s.defaultProfitPerKg) || 0,
       defaultRate: Number(s.defaultRate) || 0,
       driverPerDay: Number(s.driverPerDay) || 0,
+      mileageKmpl: Number(s.mileageKmpl) || 0,
+      dieselPrice: Number(s.dieselPrice) || 0,
+      ...pickup,
       maxUnpaidDays: Number(s.maxUnpaidDays) || 0,
       warnPercent: Number(s.warnPercent) || 80
     })
@@ -58,6 +75,18 @@ export default function Settings() {
             </Field>
             <Field label="Default selling rate (₹/kg)">
               <input type="number" inputMode="decimal" value={s.defaultRate} onChange={(e) => set('defaultRate', e.target.value)} />
+            </Field>
+          </div>
+          <h3 className="h3"><Icon name="route" size={18} /> Pickup point &amp; diesel</h3>
+          <Field label="Pickup point (every route starts and returns here)" hint={`Name, Google Maps link, lat,lng or plus code. Saved at ${Number(data.settings.depotLat).toFixed(4)}, ${Number(data.settings.depotLng).toFixed(4)}`}>
+            <input value={s.depotName} onChange={(e) => set('depotName', e.target.value)} placeholder="Koratturr" />
+          </Field>
+          <div className="two">
+            <Field label="Truck mileage (km per litre)" hint="Used to estimate diesel for each route">
+              <input type="number" inputMode="decimal" value={s.mileageKmpl} onChange={(e) => set('mileageKmpl', e.target.value)} />
+            </Field>
+            <Field label="Diesel price (₹ per litre)">
+              <input type="number" inputMode="decimal" value={s.dieselPrice} onChange={(e) => set('dieselPrice', e.target.value)} />
             </Field>
           </div>
           <Field label="Driver salary per day (₹)" hint="Pre-filled on each day's entry">

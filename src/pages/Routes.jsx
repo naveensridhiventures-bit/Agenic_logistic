@@ -2,8 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion, Reorder, useDragControls } from 'framer-motion'
 import { useApp } from '../store'
 import { unitCostOf } from '../lib/calc'
-import { fmtDur, hasLL, mapsLinks, optimizeOrder, osrmOrder, routeMetrics } from '../lib/geo'
+import { dieselFor, fmtDur, hasLL, mapsLinks, optimizeOrder, osrmOrder, routeMetrics } from '../lib/geo'
 import { autoAllocate, driverStart, loadOf, placeStop, renumber, routesForDate, suggest, toRows } from '../lib/routing'
+import LiveBoard from '../components/LiveBoard'
 import { cx, inr, kgf, sum } from '../lib/util'
 import { DateNav, Empty, Icon, Num, rise, stagger, Tilt } from '../components/ui'
 import RouteMap from '../components/RouteMap'
@@ -59,6 +60,7 @@ function Lane({ driver, color, stops, dueBy, data, onSave, onMove, onUnassign, o
   const m = routeMetrics(start, ordered)
   const links = mapsLinks(start, ordered)
   const profit = sum(stops, (s) => s.qty * (s.rate - unitCostOf(s, data)))
+  const dz = dieselFor(m.km, data.settings)
 
   const commit = () => {
     const next = idsRef.current.map((i) => byId[i]).filter(Boolean)
@@ -92,10 +94,12 @@ function Lane({ driver, color, stops, dueBy, data, onSave, onMove, onUnassign, o
       </div>
 
       <div className="metrics">
-        <span><b>{m.km.toFixed(1)}</b> km</span>
+        <span><b>{m.km.toFixed(1)}</b> km{start ? ' loop' : ''}</span>
+        {dz.ok && m.km > 0 && <span title={`${dz.litres.toFixed(1)} litres`}><b>{inr(dz.cost)}</b> diesel</span>}
         <span><b>{stops.length ? fmtDur(m.minutes) : '—'}</b> est.</span>
         <span className={profit >= 0 ? 'pos' : 'neg'}><b>{inr(profit, true)}</b> profit</span>
       </div>
+      {start && stops.length > 0 && <small className="muted">Starts at and returns to {data.settings.depotName || 'the pickup point'}.</small>}
       {m.missing > 0 && <small className="warn">{m.missing} stop{m.missing > 1 ? 's' : ''} without map location are not counted in distance.</small>}
 
       <RouteMap start={start} stops={ordered} color={color} />
@@ -127,6 +131,7 @@ function Lane({ driver, color, stops, dueBy, data, onSave, onMove, onUnassign, o
 
 export default function Routes() {
   const { data, dues, date, upsertMany, setAssignFor, setDriversOpen, toast } = useApp()
+  const [view, setView] = useState('plan')
   const [locOpen, setLocOpen] = useState(false)
   const [optimizing, setOptimizing] = useState('')
   const [pdfBusy, setPdfBusy] = useState('')
@@ -136,6 +141,7 @@ export default function Routes() {
   const all = [...Object.values(routes).flat(), ...unassigned]
   const totalKg = sum(all, (s) => s.kg)
   const km = sum(drivers, (d) => routeMetrics(driverStart(d), routes[d.id]).km)
+  const diesel = sum(drivers, (d) => dieselFor(routeMetrics(driverStart(d), routes[d.id]).km, data.settings).cost)
   const assigned = all.length - unassigned.length
   const noLoc = new Set(all.filter((s) => !hasLL(s)).map((s) => s.customerId)).size
   const sugg = useMemo(() => Object.fromEntries(unassigned.map((s) => [s.id, suggest(s, drivers, routes)])), [unassigned, drivers, routes])
@@ -162,8 +168,12 @@ export default function Routes() {
       order = optimizeOrder(driverStart(driver), stops)
       how = 'straight-line estimate (road server not reachable)'
     }
+    const before = routeMetrics(driverStart(driver), stops).km
+    const after = routeMetrics(driverStart(driver), order).km
     upsertMany('deliveries', renumber(driver.id, order))
-    toast(`Route optimized - ${how}`)
+    const saved = before - after
+    const dz = dieselFor(saved, data.settings)
+    toast(saved > 0.3 ? `${driver.name}: route optimized, saves ${saved.toFixed(1)} km${dz.ok ? ` (about ${inr(dz.cost)} diesel)` : ''} - ${how}` : `${driver.name}: route already efficient - ${how}`)
     setOptimizing('')
   }
   const optimizeAll = async () => {
@@ -187,8 +197,34 @@ export default function Routes() {
     setPdfBusy('')
   }
 
+  const toggle = (
+    <div className="seg">
+      {[['plan', 'Plan'], ['live', 'Live status']].map(([k, label]) => (
+        <button key={k} type="button" className={cx(view === k && 'on')} onClick={() => setView(k)}>
+          {view === k && <motion.i layoutId="routeseg" className="seg-pill" transition={{ type: 'spring', damping: 26, stiffness: 320 }} />}
+          <span>{label}</span>
+        </button>
+      ))}
+    </div>
+  )
+  if (view === 'live')
+    return (
+      <motion.div className="stack" variants={stagger} initial="hidden" animate="show">
+        <motion.div variants={rise} className="row between wrap">
+          <div>
+            <h2 className="h1">Live status</h2>
+            <p className="muted">What each driver has done so far. Updates every few seconds.</p>
+          </div>
+          <DateNav future={3} />
+        </motion.div>
+        <motion.div variants={rise}>{toggle}</motion.div>
+        <LiveBoard />
+      </motion.div>
+    )
+
   return (
     <motion.div className="stack" variants={stagger} initial="hidden" animate="show">
+      <motion.div variants={rise}>{toggle}</motion.div>
       <motion.div variants={rise} className="row between wrap">
         <div>
           <h2 className="h1">Routes &amp; drivers</h2>
@@ -233,7 +269,7 @@ export default function Routes() {
         </Tilt>
         <Tilt variants={rise} className="tile">
           <span className="tile-ic"><Icon name="route" size={18} /></span>
-          <small>Est. total distance</small>
+          <small>Est. distance · diesel {inr(diesel)}</small>
           <b><Num value={km} format={(v) => `${v.toFixed(1)} km`} /></b>
         </Tilt>
       </div>

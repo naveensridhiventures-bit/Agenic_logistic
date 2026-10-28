@@ -15,6 +15,7 @@ const emptyData = () => ({
   deliveries: [],
   costs: [],
   trips: [],
+  tracking: [],
   payments: [],
   drivers: [],
   settings: { ...DEFAULT_SETTINGS },
@@ -41,7 +42,7 @@ const loadQueue = () => {
 function normalize(raw) {
   const num = (v) => (v === '' || v == null ? 0 : Number(v))
   const ll = (v) => (v === '' || v == null || !Number.isFinite(Number(v)) ? null : Number(v))
-  return {
+  const out = {
     customers: (raw.customers || []).map((c) => ({
       ...c,
       id: String(c.id),
@@ -69,6 +70,7 @@ function normalize(raw) {
       id: String(d.id),
       capacityKg: num(d.capacityKg),
       baseRoute: String(d.baseRoute || ''),
+      pin: String(d.pin || ''),
       startLat: ll(d.startLat),
       startLng: ll(d.startLng),
       active: d.active === false || String(d.active).toUpperCase() === 'FALSE' ? false : true
@@ -81,6 +83,7 @@ function normalize(raw) {
       porter: num(c.porter),
       other: num(c.other)
     })),
+    tracking: (raw.tracking || []).map((t) => ({ ...t, id: String(t.id), payAmount: num(t.payAmount) })),
     trips: (raw.trips || []).map((t) => ({
       ...t,
       id: String(t.id),
@@ -105,6 +108,12 @@ function normalize(raw) {
       )
     }
   }
+  // every driver starts from (and returns to) the pickup point unless given another start
+  const st = out.settings
+  out.drivers = out.drivers.map((d) =>
+    d.startLat != null && d.startLng != null ? d : { ...d, startLat: st.depotLat, startLng: st.depotLng, startAddress: d.startAddress || st.depotName }
+  )
+  return out
 }
 
 const upsertRow = (rows, row) => {

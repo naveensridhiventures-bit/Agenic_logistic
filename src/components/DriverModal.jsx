@@ -6,7 +6,7 @@ import { parseRoute, routesForDate } from '../lib/routing'
 import { todayStr, uid } from '../lib/util'
 import { Empty, Field, Icon, Modal } from './ui'
 
-const blank = { id: null, name: '', phone: '', vehicle: '', capacityKg: '', startAddress: '', stretch: '', baseRoute: '', active: true }
+const blank = { id: null, name: '', phone: '', vehicle: '', capacityKg: '', startAddress: '', stretch: '', baseRoute: '', pin: '', active: true }
 
 export default function DriverModal() {
   const { data, driversOpen, setDriversOpen, upsert, upsertMany, remove, toast } = useApp()
@@ -37,6 +37,8 @@ export default function DriverModal() {
   const save = async (e) => {
     e.preventDefault()
     if (!edit.name.trim()) return toast('Driver name is required', 'warn')
+    if (edit.pin && !/^\d{4}$/.test(String(edit.pin))) return toast('Driver PIN must be exactly 4 digits', 'warn')
+    if (edit.pin && data.drivers.some((x) => x.id !== edit.id && String(x.pin) === String(edit.pin))) return toast('Another driver already uses this PIN. Pick a different one.', 'warn')
     setSaving(true)
     let startLat = null
     let startLng = null
@@ -72,6 +74,7 @@ export default function DriverModal() {
       startLng,
       stretch: edit.stretch.trim(),
       baseRoute: edit.baseRoute || '',
+      pin: String(edit.pin || ''),
       active: edit.active
     })
     setSaving(false)
@@ -100,6 +103,17 @@ export default function DriverModal() {
 
         {!edit && (
           <>
+            <div className="preview solid col">
+              <span>
+                <b>Driver app link</b> - send this to your drivers and tap Add to Home screen
+              </span>
+              <div className="row gap wrap">
+                <input readOnly value={`${location.origin}/?driver=1`} onFocus={(e) => e.target.select()} />
+                <button type="button" className="btn ghost" onClick={() => navigator.clipboard?.writeText(`${location.origin}/?driver=1`).then(() => toast('Link copied'))}>
+                  Copy
+                </button>
+              </div>
+            </div>
             <AnimatePresence initial={false}>
               {drivers.map((d) => (
                 <motion.div key={d.id} layout className="li" initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, height: 0 }}>
@@ -107,7 +121,7 @@ export default function DriverModal() {
                   <div className="li-main">
                     <b>{d.name}</b>
                     <small>
-                      {d.vehicle || 'Vehicle —'} · {d.capacityKg ? `${d.capacityKg} kg` : 'no capacity set'} · {d.stretch ? `Stretch: ${d.stretch}` : 'no stretch set'}
+                      {d.vehicle || 'Vehicle —'} · {d.capacityKg ? `${d.capacityKg} kg` : 'no capacity set'} · {d.pin ? 'Login ready' : 'No login PIN'}{d.stretch ? ` · Stretch: ${d.stretch}` : ''}
                     </small>
                   </div>
                   <button className="icon-btn" onClick={() => setEdit({ ...blank, ...d, capacityKg: d.capacityKg || '', origStart: d.startAddress || '' })} aria-label="Edit">
@@ -176,6 +190,14 @@ export default function DriverModal() {
                 {baseIds.length > 6 ? ' › …' : ''}
               </small>
             )}
+            <Field label="Driver login PIN (4 digits)" hint="He opens the driver link, picks his name and enters this PIN. Leave empty for no login.">
+              <div className="row gap">
+                <input inputMode="numeric" maxLength={4} value={edit.pin} onChange={(e) => setEdit({ ...edit, pin: e.target.value.replace(/\D/g, '').slice(0, 4) })} placeholder="e.g. 4821" />
+                <button type="button" className="btn ghost" onClick={() => setEdit({ ...edit, pin: String(1000 + Math.floor(Math.random() * 9000)) })}>
+                  Generate
+                </button>
+              </div>
+            </Field>
             <Field label="Start point" hint="Address, Google Maps link, lat,lng or plus code. Where he loads / begins the day.">
               <input value={edit.startAddress} onChange={(e) => setEdit({ ...edit, startAddress: e.target.value })} placeholder="Agenic kitchen, Perungudi" />
             </Field>

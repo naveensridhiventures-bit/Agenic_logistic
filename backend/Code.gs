@@ -17,7 +17,8 @@ const SCHEMA = {
   costs: { tab: 'DayCosts', cols: ['id', 'date', 'driver', 'diesel', 'porter', 'other', 'porterBooked', 'note'], text: ['id', 'date'] },
   trips: { tab: 'Trips', cols: ['id', 'date', 'mode', 'cost', 'customerIds', 'note'], text: ['id', 'date', 'customerIds'] },
   payments: { tab: 'Payments', cols: ['id', 'date', 'customerId', 'customerName', 'amount', 'mode', 'note'], text: ['id', 'date', 'customerId'] },
-  drivers: { tab: 'Drivers', cols: ['id', 'name', 'phone', 'vehicle', 'capacityKg', 'startAddress', 'startLat', 'startLng', 'stretch', 'active', 'baseRoute'], text: ['id', 'phone', 'baseRoute'] },
+  drivers: { tab: 'Drivers', cols: ['id', 'name', 'phone', 'vehicle', 'capacityKg', 'startAddress', 'startLat', 'startLng', 'stretch', 'active', 'baseRoute', 'pin'], text: ['id', 'phone', 'baseRoute', 'pin'] },
+  tracking: { tab: 'Tracking', cols: ['id', 'date', 'driverId', 'customerId', 'status', 'doneAt', 'remark', 'voiceId', 'payMode', 'payAmount', 'payAt', 'updatedAt'], text: ['id', 'date', 'driverId', 'customerId', 'voiceId', 'doneAt', 'payAt', 'updatedAt'] },
   settings: { tab: 'Settings', cols: ['key', 'value'], text: [] }
 };
 
@@ -37,6 +38,7 @@ function setup() {
   const first = ss.getSheets()[0];
   if (first && first.getName() === 'Sheet1' && ss.getSheets().length > 1) ss.deleteSheet(first);
   installTrigger();
+  voiceFolder_(); // creates the Drive folder for driver voice notes and asks for Drive permission
   Logger.log('Setup complete. Now deploy as a Web app.');
 }
 
@@ -67,7 +69,9 @@ function doPost(e) {
   try {
     lock.waitLock(20000);
     const req = JSON.parse(e.postData.contents);
+    if (String(req.action || '').indexOf('driver') === 0) return json_({ ok: true, data: driverApi_(req) });
     check_(req.key);
+    if (req.action === 'getVoice') return json_({ ok: true, data: getVoice_(req.fileId) });
     switch (req.action) {
       case 'upsert': upsert_(req.sheet, req.row); break;
       case 'upsertMany': upsertMany_(req.sheet, req.rows); break;
@@ -86,6 +90,178 @@ function doPost(e) {
 
 function check_(key) {
   if (!key || key !== API_KEY) throw new Error('Wrong secret key');
+}
+
+/* ------------------------------------------------------------ driver app */
+// Drivers log in with their name + PIN (set by the admin in the app). No admin key is ever sent to a driver.
+function today_() { return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd'); }
+function nowIso_() { return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd'T'HH:mm:ss"); }
+
+function token_(d) {
+  const sig = Utilities.computeHmacSha256Signature(String(d.id) + '|' + String(d.pin), API_KEY);
+  return Utilities.base64EncodeWebSafe(sig);
+}
+
+function authDriver_(req) {
+  const d = read_('drivers').filter(function (x) { return String(x.id) === String(req.driverId); })[0];
+  if (!d || String(d.active).toUpperCase() === 'FALSE' || !String(d.pin || '')) throw new Error('Driver login is not available. Ask the admin.');
+  if (!req.token || req.token !== token_(d)) throw new Error('Session expired. Please log in again.');
+  return d;
+}
+
+function driverApi_(req) {
+  switch (req.action) {
+    case 'driverList': return driverList_();
+    case 'driverLogin': return driverLogin_(req.driverId, req.pin);
+    case 'driverRoute': return driverRoute_(authDriver_(req), req.date);
+    case 'driverUpdate': return driverUpdate_(authDriver_(req), req);
+    case 'driverVoice': return driverVoice_(authDriver_(req), req);
+    default: throw new Error('Unknown action: ' + req.action);
+  }
+}
+
+function driverList_() {
+  return read_('drivers')
+    .filter(function (d) { return String(d.active).toUpperCase() !== 'FALSE' && String(d.pin || ''); })
+    .map(function (d) { return { id: String(d.id), name: d.name }; });
+}
+
+function driverLogin_(driverId, pin) {
+  const cache = CacheService.getScriptCache();
+  const failKey = 'fail_' + driverId;
+  const fails = Number(cache.get(failKey) || 0);
+  if (fails >= 5) throw new Error('Too many wrong PINs. Try again in 10 minutes.');
+  const d = read_('drivers').filter(function (x) { return String(x.id) === String(driverId); })[0];
+  if (!d || String(d.active).toUpperCase() === 'FALSE' || !String(d.pin || '') || String(d.pin) !== String(pin)) {
+    cache.put(failKey, String(fails + 1), 600);
+    throw new Error('Wrong PIN');
+  }
+  cache.remove(failKey);
+  return { driver: { id: String(d.id), name: d.name, phone: d.phone, vehicle: d.vehicle }, token: token_(d) };
+}
+
+function driverRoute_(d, date) {
+  const day = /^\d{4}-\d{2}-\d{2}$/.test(String(date || '')) ? date : today_();
+  const customers = {};
+  read_('customers').forEach(function (c) { customers[String(c.id)] = c; });
+  const deliveries = read_('deliveries');
+  const payments = read_('payments');
+  const tracking = {};
+  read_('tracking').forEach(function (t) { tracking[String(t.id)] = t; });
+  const mine = deliveries
+    .filter(function (x) { return x.date === day && String(x.driverId) === String(d.id); })
+    .sort(function (a, b) { return (Number(a.seq) || 999) - (Number(b.seq) || 999); });
+  const amt = function (x) { return Number(x.amount) || (Number(x.qty) || 0) * (Number(x.rate) || 0); };
+  const stops = mine.map(function (x, i) {
+    const c = customers[String(x.customerId)] || {};
+    const cid = String(x.customerId);
+    const before = deliveries.filter(function (y) { return String(y.customerId) === cid && y.date < day; }).reduce(function (s, y) { return s + amt(y); }, 0);
+    const todays = deliveries.filter(function (y) { return String(y.customerId) === cid && y.date === day; }).reduce(function (s, y) { return s + amt(y); }, 0);
+    const paid = payments.filter(function (p) { return String(p.customerId) === cid; }).reduce(function (s, p) { return s + (Number(p.amount) || 0); }, 0);
+    const previous = Math.max(0, before - paid);
+    const todayDue = Math.max(0, Math.min(todays, todays - Math.max(0, paid - before)));
+    const t = tracking[String(x.id)] || {};
+    return {
+      id: String(x.id), seq: i + 1, customerId: cid, name: x.customerName || c.name || '', phone: c.phone || '', area: c.area || '',
+      address: c.address || '', lat: c.lat === '' ? null : c.lat, lng: c.lng === '' ? null : c.lng,
+      qty: Number(x.qty) || 0, rate: Number(x.rate) || 0, bill: amt(x),
+      due: { previous: Math.round(previous), today: Math.round(todayDue), total: Math.round(previous + todayDue) },
+      track: { status: t.status || 'pending', remark: t.remark || '', voiceId: t.voiceId || '', payMode: t.payMode || '', payAmount: Number(t.payAmount) || 0, doneAt: t.doneAt || '' }
+    };
+  });
+  const st = {};
+  read_('settings').forEach(function (r) { st[r.key] = r.value; });
+  return {
+    date: day, serverTime: nowIso_(),
+    driver: { id: String(d.id), name: d.name, phone: d.phone, vehicle: d.vehicle },
+    depot: { name: st.depotName || 'Koratturr', lat: Number(st.depotLat) || 13.1143, lng: Number(st.depotLng) || 80.185 },
+    stops: stops
+  };
+}
+
+function trackRow_(id) {
+  const s = sheet_('tracking');
+  const at = findRow_(s, id);
+  if (at < 0) return { id: String(id) };
+  const vals = s.sh.getRange(at, 1, 1, s.def.cols.length).getValues()[0];
+  const o = {};
+  s.def.cols.forEach(function (c, i) { o[c] = cell_(vals[i]); });
+  return o;
+}
+
+function ownDelivery_(d, deliveryId) {
+  const x = read_('deliveries').filter(function (y) { return String(y.id) === String(deliveryId); })[0];
+  if (!x || String(x.driverId) !== String(d.id)) throw new Error('This order is not assigned to you');
+  return x;
+}
+
+function driverUpdate_(d, req) {
+  const del = ownDelivery_(d, req.deliveryId);
+  const row = trackRow_(del.id);
+  const p = req.patch || {};
+  row.date = del.date; row.driverId = String(d.id); row.customerId = String(del.customerId);
+  if (p.status !== undefined) {
+    if (['pending', 'arrived', 'delivered', 'skipped'].indexOf(p.status) < 0) throw new Error('Bad status');
+    row.status = p.status;
+    if ((p.status === 'delivered' || p.status === 'skipped') && !row.doneAt) row.doneAt = nowIso_();
+    if (p.status === 'pending' || p.status === 'arrived') row.doneAt = '';
+  }
+  if (p.remark !== undefined) row.remark = String(p.remark).slice(0, 600);
+  if (p.payMode !== undefined) {
+    if (['', 'cash', 'gpay', 'pending'].indexOf(p.payMode) < 0) throw new Error('Bad payment mode');
+    row.payMode = p.payMode;
+    row.payAmount = Math.max(0, Math.min(1000000, Number(p.payAmount) || 0));
+    row.payAt = row.payMode === 'cash' || row.payMode === 'gpay' ? nowIso_() : '';
+  }
+  row.updatedAt = nowIso_();
+  upsert_('tracking', row);
+  // money collected becomes a normal payment, so ledger, dues and reports update by themselves
+  if (p.payMode !== undefined) {
+    const payId = 'drv-' + del.id;
+    if ((row.payMode === 'cash' || row.payMode === 'gpay') && row.payAmount > 0) {
+      upsert_('payments', { id: payId, date: today_(), customerId: String(del.customerId), customerName: del.customerName, amount: row.payAmount, mode: row.payMode === 'gpay' ? 'UPI' : 'Cash', note: 'Collected by ' + d.name });
+    } else if (findRow_(sheet_('payments'), payId) > 0) {
+      remove_('payments', payId);
+    }
+  }
+  return { track: row };
+}
+
+function voiceFolder_() {
+  const props = PropertiesService.getScriptProperties();
+  const id = props.getProperty('VOICE_FOLDER');
+  if (id) { try { return DriveApp.getFolderById(id); } catch (x) {} }
+  const f = DriveApp.createFolder(COMPANY + ' driver voice notes');
+  props.setProperty('VOICE_FOLDER', f.getId());
+  return f;
+}
+
+function driverVoice_(d, req) {
+  const del = ownDelivery_(d, req.deliveryId);
+  const data = String(req.data || '');
+  if (!data || data.length > 4500000) throw new Error('Voice note is empty or too long');
+  const mime = /^audio\//.test(String(req.mime || '')) ? String(req.mime).split(';')[0] : 'audio/webm';
+  const ext = mime.indexOf('mp4') >= 0 || mime.indexOf('aac') >= 0 ? 'm4a' : mime.indexOf('ogg') >= 0 ? 'ogg' : mime.indexOf('wav') >= 0 ? 'wav' : 'webm';
+  const blob = Utilities.newBlob(Utilities.base64Decode(data), mime, 'voice_' + del.date + '_' + String(del.customerName).replace(/[^A-Za-z0-9]+/g, '_') + '_' + del.id + '.' + ext);
+  const file = voiceFolder_().createFile(blob);
+  const row = trackRow_(del.id);
+  if (row.voiceId) { try { DriveApp.getFileById(row.voiceId).setTrashed(true); } catch (x) {} }
+  row.date = del.date; row.driverId = String(d.id); row.customerId = String(del.customerId);
+  row.voiceId = file.getId(); row.updatedAt = nowIso_();
+  upsert_('tracking', row);
+  return { voiceId: row.voiceId };
+}
+
+// Admin only: returns a voice note so the app can play it (files stay private in your Drive).
+function getVoice_(fileId) {
+  const file = DriveApp.getFileById(String(fileId));
+  const folder = voiceFolder_();
+  const parents = file.getParents();
+  var ok = false;
+  while (parents.hasNext()) if (parents.next().getId() === folder.getId()) ok = true;
+  if (!ok) throw new Error('Not a driver voice note');
+  const blob = file.getBlob();
+  return { mime: blob.getContentType(), data: Utilities.base64Encode(blob.getBytes()) };
 }
 
 /* ------------------------------------------------------------ data layer */
@@ -118,7 +294,7 @@ function read_(name) {
 
 function getAll_() {
   const out = {};
-  ['customers', 'deliveries', 'costs', 'payments', 'drivers', 'trips'].forEach(function (k) { out[k] = read_(k); });
+  ['customers', 'deliveries', 'costs', 'payments', 'drivers', 'trips', 'tracking'].forEach(function (k) { out[k] = read_(k); });
   const settings = {};
   read_('settings').forEach(function (r) { settings[r.key] = r.value; });
   out.settings = settings;

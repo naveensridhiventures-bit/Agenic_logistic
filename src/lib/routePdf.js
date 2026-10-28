@@ -1,6 +1,6 @@
 // Driver route sheets: big stop numbers, schematic map, tap-to-navigate links and QR codes.
 import { computeDues } from './calc'
-import { fmtDur, hasLL, mapsLinks, mapsStopUrl, routeMetrics } from './geo'
+import { dieselFor, fmtDur, hasLL, mapsLinks, mapsStopUrl, routeMetrics } from './geo'
 import { driverStart, loadOf, routesForDate } from './routing'
 import { fmtLong } from './util'
 
@@ -174,14 +174,14 @@ export async function buildRoutePdf({ date, data, driverId }) {
     chips([
       { label: 'STOPS', value: stops.length },
       { label: 'TOTAL LOAD', value: `${Math.round(loadOf(stops) * 10) / 10} kg` },
-      { label: 'EST. DISTANCE', value: m.km ? `${m.km.toFixed(1)} km` : '-' },
+      { label: start ? 'LOOP DISTANCE' : 'EST. DISTANCE', value: m.km ? `${m.km.toFixed(1)} km` : '-' },
       { label: 'EST. TIME', value: m.minutes ? fmtDur(m.minutes) : '-', small: true },
-      { label: 'VEHICLE', value: d.vehicle || '-', small: true }
+      { label: 'DIESEL (EST.)', value: dieselFor(m.km, data.settings).ok ? `${dieselFor(m.km, data.settings).litres.toFixed(1)} L / ${rs(dieselFor(m.km, data.settings).cost)}` : (d.vehicle || '-'), small: true }
     ])
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(8.6)
     doc.setTextColor(...COL.mute)
-    const meta = [d.startAddress ? `Start: ${d.startAddress}` : '', d.stretch ? `Stretch: ${d.stretch}` : '', d.phone ? `Driver phone: ${d.phone}` : ''].filter(Boolean).join('    |    ')
+    const meta = [start ? `Starts and returns to: ${data.settings.depotName || d.startAddress || 'pickup point'}` : '', d.vehicle ? `Vehicle: ${d.vehicle}` : '', d.stretch ? `Stretch: ${d.stretch}` : '', d.phone ? `Driver phone: ${d.phone}` : ''].filter(Boolean).join('    |    ')
     if (meta) {
       const lines = doc.splitTextToSize(meta, W - 2 * M)
       doc.text(lines, M, y)
@@ -195,8 +195,8 @@ export async function buildRoutePdf({ date, data, driverId }) {
     const rows = []
     const meta2 = []
     if (d.startAddress || start) {
-      rows.push(['S', 'START', d.startAddress || 'Start point', '', '', '', ''])
-      meta2.push(null)
+      rows.push(['S', 'START', data.settings.depotName || d.startAddress || 'Pickup point', '', '', '', ''])
+      meta2.push({ kind: 'start' })
     }
     stops.forEach((s, i) => {
       const due = duesBy.get(s.customerId)
@@ -204,6 +204,10 @@ export async function buildRoutePdf({ date, data, driverId }) {
       rows.push([i + 1, `${s.name}${s.phone ? `\n${s.phone}` : ''}`, (s.address || s.area || 'Address not saved').slice(0, 160), `${Math.round(s.kg * 10) / 10} kg`, collect, 'Open Maps', ''])
       meta2.push(s)
     })
+    if (start && stops.length) {
+      rows.push(['R', 'RETURN', `Back to ${data.settings.depotName || 'pickup point'}. Hand over cash and notes.`, '', '', '', ''])
+      meta2.push({ kind: 'return' })
+    }
     autoTable(doc, {
       startY: y,
       margin: { left: M, right: M, top: M + 2 },
@@ -222,7 +226,7 @@ export async function buildRoutePdf({ date, data, driverId }) {
         if (c === 0) {
           h.cell.styles.fontSize = 15
           h.cell.styles.fontStyle = 'bold'
-          h.cell.styles.textColor = h.cell.raw === 'S' ? COL.pos : COL.brand
+          h.cell.styles.textColor = h.cell.raw === 'S' || h.cell.raw === 'R' ? COL.pos : COL.brand
         }
         if (c === 3) {
           h.cell.styles.fontSize = 12
@@ -232,8 +236,8 @@ export async function buildRoutePdf({ date, data, driverId }) {
           h.cell.styles.textColor = COL.neg
           h.cell.styles.fontStyle = 'bold'
         }
-        if (c === 5 && meta2[h.row.index]) h.cell.styles.textColor = [255, 255, 255] // drawn as a button below
-        if (meta2[h.row.index] === null) {
+        if (c === 5 && meta2[h.row.index] && !meta2[h.row.index].kind) h.cell.styles.textColor = [255, 255, 255] // drawn as a button below
+        if (meta2[h.row.index]?.kind) {
           h.cell.styles.fillColor = [226, 247, 238]
           if (c === 1 || c === 2) h.cell.styles.fontStyle = 'bold'
         }
@@ -241,7 +245,7 @@ export async function buildRoutePdf({ date, data, driverId }) {
       didDrawCell: (h) => {
         if (h.section !== 'body') return
         const s = meta2[h.row.index]
-        if (h.column.index === 5 && s) {
+        if (h.column.index === 5 && s && !s.kind) {
           const { x, y: cy, width, height } = h.cell
           doc.setFillColor(...COL.link)
           doc.roundedRect(x + 1.5, cy + height / 2 - 4, width - 3, 8, 1.8, 1.8, 'F')
@@ -251,7 +255,7 @@ export async function buildRoutePdf({ date, data, driverId }) {
           doc.text('Open Maps', x + width / 2, cy + height / 2 + 1, { align: 'center' })
           doc.link(x, cy, width, height, { url: mapsStopUrl(s) })
         }
-        if (h.column.index === 6 && s) {
+        if (h.column.index === 6 && s && !s.kind) {
           const { x, y: cy, width, height } = h.cell
           doc.setDrawColor(...COL.mute)
           doc.setLineWidth(0.4)

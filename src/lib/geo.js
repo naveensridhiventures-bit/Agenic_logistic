@@ -144,18 +144,21 @@ export async function geocodeCustomer(c, signal) {
 }
 
 /* ---------------- route maths ---------------- */
-export function pathKm(start, stops) {
+// With a pickup point every route is a loop: pickup -> stops -> back to pickup.
+export function pathKm(start, stops, ret = false) {
   let km = 0
-  let prev = hasLL(start) ? start : null
+  const s0 = hasLL(start) ? start : null
+  let prev = s0
   for (const s of stops) {
     if (!hasLL(s)) continue
     if (prev) km += roadKm(prev, s)
     prev = s
   }
+  if (ret && s0 && prev && prev !== s0) km += roadKm(prev, s0)
   return km
 }
 export function routeMetrics(start, stops) {
-  const km = pathKm(start, stops)
+  const km = pathKm(start, stops, true)
   const missing = stops.filter((s) => !hasLL(s)).length
   return { km, minutes: (km / SPEED_KMH) * 60 + stops.length * SERVICE_MIN, missing }
 }
@@ -163,19 +166,49 @@ export const fmtDur = (min) => {
   const m = Math.round(min)
   return m >= 60 ? `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min` : `${m} min`
 }
+/** Diesel for a distance: litres and rupees. */
+export function dieselFor(km, settings) {
+  const mileage = Number(settings?.mileageKmpl) || 0
+  const price = Number(settings?.dieselPrice) || 0
+  const litres = mileage > 0 ? km / mileage : 0
+  return { litres, cost: litres * price, ok: mileage > 0 }
+}
+/** Kg-km: distance weighted by the load still on the truck. Lower = less fuel (heavy drops come first). */
+export function loadCost(start, stops) {
+  let load = stops.reduce((a, x) => a + (Number(x.kg) || 0), 0)
+  let prev = hasLL(start) ? start : null
+  let c = 0
+  for (const s of stops) {
+    if (!hasLL(s)) {
+      load -= Number(s.kg) || 0
+      continue
+    }
+    if (prev) c += roadKm(prev, s) * (load + 30) // +30 kg stands for the empty truck and driver
+    load -= Number(s.kg) || 0
+    prev = s
+  }
+  return c
+}
 
-/** Best order for stops: nearest-neighbour start + 2-opt improvement. Stops without coordinates go last. */
+/**
+ * Diesel-saving order. With a pickup point it builds a closed loop (nearest neighbour + 2-opt + or-opt),
+ * so the far run goes out one way and the nearer hotels are served on the way back.
+ * Of the two directions it keeps the one that drops the heavy loads first.
+ * Stops without coordinates go last.
+ */
 export function optimizeOrder(start, stops) {
   const withC = stops.filter(hasLL)
   const without = stops.filter((s) => !hasLL(s))
   if (withC.length < 2) return [...withC, ...without]
   const hasStart = hasLL(start)
+  const S = hasStart ? start : null
+  const len = (o) => pathKm(S, o, true)
   let best = null
   const seeds = hasStart ? [null] : withC.map((_, i) => i)
   for (const si of seeds) {
     const left = [...withC]
     const order = []
-    let cur = hasStart ? start : null
+    let cur = S
     if (!hasStart) {
       cur = left.splice(si, 1)[0]
       order.push(cur)
@@ -195,60 +228,84 @@ export function optimizeOrder(start, stops) {
     }
     let improved = true
     let guard = 0
-    while (improved && guard++ < 60) {
+    while (improved && guard++ < 80) {
       improved = false
-      const base = pathKm(hasStart ? start : null, order)
+      const base = len(order)
       for (let i = 0; i < order.length - 1 && !improved; i++) {
         for (let j = i + 1; j < order.length; j++) {
           const cand = [...order.slice(0, i), ...order.slice(i, j + 1).reverse(), ...order.slice(j + 1)]
-          if (pathKm(hasStart ? start : null, cand) + 1e-9 < base) {
+          if (len(cand) + 1e-9 < base) {
             order.splice(0, order.length, ...cand)
             improved = true
             break
           }
         }
       }
+      if (!improved) {
+        // or-opt: move one stop somewhere else
+        for (let i = 0; i < order.length && !improved; i++) {
+          const one = order[i]
+          const rest = [...order.slice(0, i), ...order.slice(i + 1)]
+          for (let j = 0; j <= rest.length; j++) {
+            if (j === i) continue
+            const cand = [...rest.slice(0, j), one, ...rest.slice(j)]
+            if (len(cand) + 1e-9 < base) {
+              order.splice(0, order.length, ...cand)
+              improved = true
+              break
+            }
+          }
+        }
+      }
     }
-    const L = pathKm(hasStart ? start : null, order)
+    const L = len(order)
     if (!best || L < best.L) best = { order, L }
   }
-  return [...best.order, ...without]
+  let order = best.order
+  if (hasStart) {
+    const rev = [...order].reverse()
+    if (loadCost(S, rev) + 1e-9 < loadCost(S, order)) order = rev
+  }
+  return [...order, ...without]
 }
 
-/** Cheapest place to add one more stop to a route. Returns { pos, extraKm }. */
+/** Cheapest place to add a stop (the route returns to the pickup point, so the last leg counts too). */
 export function bestInsertion(start, stops, p) {
   const route = stops.filter(hasLL)
   const s = hasLL(start) ? start : null
   if (!hasLL(p)) return { pos: stops.length, extraKm: null }
-  if (!route.length) return { pos: 0, extraKm: s ? roadKm(s, p) : 0 }
+  if (!route.length) return { pos: 0, extraKm: s ? 2 * roadKm(s, p) : 0 }
   let best = { pos: 0, extraKm: Infinity }
   for (let i = 0; i <= route.length; i++) {
     const prev = i === 0 ? s : route[i - 1]
-    const next = route[i]
+    const next = i < route.length ? route[i] : s
     let extra
     if (prev && next) extra = roadKm(prev, p) + roadKm(p, next) - roadKm(prev, next)
     else if (prev) extra = roadKm(prev, p)
-    else extra = roadKm(p, next) // new first stop, no depot
+    else extra = roadKm(p, next) // new first stop, no pickup point
     if (extra < best.extraKm) best = { pos: i, extraKm: extra }
   }
   return best
 }
 
-/** Google Maps directions links, in chunks of 9 stops (the app limit for waypoints). */
-export function mapsLinks(start, stops, size = 9) {
+/** Google Maps directions links, in chunks of 9 stops. The last link returns to the pickup point. */
+export function mapsLinks(start, stops, size = 9, back = true) {
   const pt = (s) => (hasLL(s) ? `${s.lat},${s.lng}` : s.address ? s.address : '')
   const usable = stops.filter((s) => pt(s))
   const links = []
   let origin = start && pt(start) ? pt(start) : ''
   for (let i = 0; i < usable.length; i += size) {
     const chunk = usable.slice(i, i + size)
-    const dest = pt(chunk[chunk.length - 1])
-    const way = chunk.slice(0, -1).map(pt).join('|')
+    const lastChunk = i + size >= usable.length
+    const goHome = back && lastChunk && origin && pt(start)
+    const pts = goHome ? [...chunk, start] : chunk
+    const dest = pt(pts[pts.length - 1])
+    const way = pts.slice(0, -1).map(pt).join('|')
     let url = `https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=${encodeURIComponent(dest)}`
     if (origin) url += `&origin=${encodeURIComponent(origin)}`
     if (way) url += `&waypoints=${encodeURIComponent(way)}`
-    links.push({ url, from: i + 1, to: i + chunk.length })
-    origin = dest
+    links.push({ url, from: i + 1, to: i + chunk.length, home: !!goHome })
+    origin = pt(chunk[chunk.length - 1])
   }
   return links
 }
@@ -264,11 +321,15 @@ export async function osrmOrder(start, stops, signal) {
   const all = hasLL(start) ? [start, ...pts] : pts
   if (all.length > 90) throw new Error('too many stops for OSRM')
   const coords = all.map((p) => `${p.lng},${p.lat}`).join(';')
-  const url = `https://router.project-osrm.org/trip/v1/driving/${coords}?source=first&destination=any&roundtrip=false&overview=false`
+  const url = `https://router.project-osrm.org/trip/v1/driving/${coords}?source=first&roundtrip=true&overview=false`
   const res = await fetch(url, { signal })
   const j = await res.json()
   if (j.code !== 'Ok') throw new Error(j.message || 'OSRM could not route these stops')
   const order = j.waypoints.map((w, i) => ({ i, k: w.waypoint_index })).sort((a, b) => a.k - b.k).map((o) => all[o.i])
-  const ordered = hasLL(start) ? order.slice(1) : order
+  let ordered = hasLL(start) ? order.slice(1) : order
+  if (hasLL(start)) {
+    const rev = [...ordered].reverse()
+    if (loadCost(start, rev) + 1e-9 < loadCost(start, ordered)) ordered = rev
+  }
   return [...ordered, ...stops.filter((s) => !hasLL(s))]
 }
