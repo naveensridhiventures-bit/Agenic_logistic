@@ -12,6 +12,8 @@ const blank = { id: null, mode: 'Porter', cost: '', ids: [], note: '' }
 export default function Trips({ date, stats }) {
   const { data, upsert, remove, toast } = useApp()
   const [f, setF] = useState(null)
+  const [q, setQ] = useState('')
+  const [quick, setQuick] = useState({ id: null, v: '' })
   const hotels = []
   const seen = new Set()
   data.deliveries
@@ -23,15 +25,25 @@ export default function Trips({ date, stats }) {
     })
   const kgOf = (id) => data.deliveries.filter((d) => d.date === date && d.customerId === id).reduce((s, d) => s + (Number(d.qty) || 0), 0)
   const takenBy = (id) => stats.trips.find((t) => t.id !== f?.id && t.customerIds.split(',').includes(id))
+  const shown = [...hotels]
+    .filter((h) => !q.trim() || String(h.name).toLowerCase().includes(q.trim().toLowerCase()))
+    .sort((a, b) => (takenBy(a.id) ? 1 : 0) - (takenBy(b.id) ? 1 : 0))
   const selKg = f ? f.ids.reduce((s, id) => s + kgOf(id), 0) : 0
   const cost = f ? Number(f.cost) || 0 : 0
 
   const save = () => {
-    if (!cost) return toast('Enter the charge for this vehicle', 'warn')
     if (!f.ids.length) return toast('Pick the hotels that went in this vehicle', 'warn')
     upsert('trips', { id: f.id || uid(), date, mode: f.mode, cost, customerIds: f.ids.join(','), note: f.note.trim() })
-    toast(`${f.mode} saved - ${inr(cost)} for ${kgf(selKg)}`)
+    toast(cost ? `${f.mode} saved - ${inr(cost)} for ${kgf(selKg)}` : `${f.mode} saved for ${f.ids.length} hotel${f.ids.length === 1 ? '' : 's'}. Add the charge later.`, cost ? 'ok' : 'warn')
     setF(null)
+    setQ('')
+  }
+  const saveCharge = (t) => {
+    const v = Number(quick.v) || 0
+    if (!v) return toast('Enter the amount', 'warn')
+    upsert('trips', { ...t, cost: v, customerIds: t.customerIds, hotels: undefined, kg: undefined, perKg: undefined })
+    setQuick({ id: null, v: '' })
+    toast(`${t.mode} charge saved - ${inr(v)}`)
   }
   const del = (t) => {
     if (!confirm(`Remove this ${t.mode} trip (${inr(t.cost)})?`)) return
@@ -54,14 +66,29 @@ export default function Trips({ date, stats }) {
       <AnimatePresence initial={false}>
         {stats.trips.map((t) => (
           <motion.div key={t.id} layout className="li trip" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0 }}>
-            <span className="chip drv">{t.mode}</span>
+            <span className={cx('chip drv', t.cost > 0 ? '' : 'warn')}>{t.cost > 0 ? t.mode : `${t.mode} · pending`}</span>
             <div className="li-main">
               <b>{t.hotels.map((h) => h.name).join(', ') || 'No hotels'}</b>
               <small>
-                {kgf(t.kg)} · {inr(t.cost)}
-                {t.kg ? ` · ${pk(t.perKg)}/kg` : ''}
+                {kgf(t.kg)} · {t.cost > 0 ? inr(t.cost) : 'charge not entered yet'}
+                {t.kg && t.cost > 0 ? ` · ${pk(t.perKg)}/kg` : ''}
                 {t.note ? ` · ${t.note}` : ''}
               </small>
+              {t.cost > 0 ? null : quick.id === t.id ? (
+                <div className="row gap trip-quick">
+                  <input type="number" inputMode="decimal" autoFocus value={quick.v} onChange={(e) => setQuick({ id: t.id, v: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && saveCharge(t)} placeholder="Amount ₹" />
+                  <button type="button" className="btn primary sm" onClick={() => saveCharge(t)}>
+                    Save
+                  </button>
+                  <button type="button" className="btn ghost sm" onClick={() => setQuick({ id: null, v: '' })}>
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button type="button" className="btn ghost sm trip-add" onClick={() => setQuick({ id: t.id, v: '' })}>
+                  <Icon name="plus" size={14} /> Enter charge
+                </button>
+              )}
             </div>
             <button type="button" className="icon-btn" aria-label="Edit trip" onClick={() => setF({ id: t.id, mode: t.mode, cost: t.cost, ids: t.customerIds.split(',').filter(Boolean), note: t.note || '' })}>
               <Icon name="edit" size={16} />
@@ -99,19 +126,32 @@ export default function Trips({ date, stats }) {
         <div className="form trip-form">
           <div className="two">
             <Field label="Vehicle">
-              <select value={f.mode} onChange={(e) => setF({ ...f, mode: e.target.value })}>
+              <div className="chips">
                 {MODES.map((m) => (
-                  <option key={m}>{m}</option>
+                  <button type="button" key={m} className={cx('pick', f.mode === m && 'on')} onClick={() => setF({ ...f, mode: m })}>
+                    {m}
+                  </button>
                 ))}
-              </select>
+              </div>
             </Field>
-            <Field label="Charge (₹)">
+            <Field label="Charge (₹)" hint="Leave empty if not fixed yet. Add it later.">
               <input type="number" inputMode="decimal" value={f.cost} onChange={(e) => setF({ ...f, cost: e.target.value })} placeholder="0" />
             </Field>
           </div>
-          <Field label="Hotels in this vehicle" hint="Tap to select. Kg is taken from today's orders.">
+          <Field label="Hotels in this vehicle" hint="Search and tap to select as many as you need. Kg is taken from today's orders.">
+            <input className="trip-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search hotel…" />
+            <div className="row gap wrap">
+              <button type="button" className="link" onClick={() => setF({ ...f, ids: [...new Set([...f.ids, ...shown.filter((h) => !takenBy(h.id)).map((h) => h.id)])] })}>
+                Select all shown
+              </button>
+              {f.ids.length > 0 && (
+                <button type="button" className="link" onClick={() => setF({ ...f, ids: [] })}>
+                  Clear ({f.ids.length})
+                </button>
+              )}
+            </div>
             <div className="chips">
-              {hotels.map((h) => {
+              {shown.map((h) => {
                 const on = f.ids.includes(h.id)
                 const other = takenBy(h.id)
                 return (

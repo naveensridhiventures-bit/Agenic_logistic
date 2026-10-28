@@ -89,3 +89,5 @@ After updating `Code.gs`: paste it, run `setup` once (creates the Tracking tab a
 - **Settings → Office phone** is shown in the driver app (Call office button).
 - Locked stops, and the final return to the pickup point, open with a **4-digit code**. The driver taps Unlock, sees the office number to call, and enters the code the admin reads out. The admin finds it in **Routes → Live status** (button *Unlock code* on each waiting stop, and *Return code* per driver). Five wrong codes lock the attempts for 10 minutes. Stops opened early are marked *Unlocked early*.
 - The driver's **Route** button shows the whole route without locks: stretch, a sketch map, every hotel name in order with its status, and QR codes / buttons that open the full route in Google Maps.
+
+**Porter quick flow:** Daily Entry → Hired vehicles → Add vehicle. Pick the vehicle, search and tick the hotels, and save. The charge can stay empty and be added later with *Enter charge* (marked "pending" until then). The PDF shows "Pending" for trips with no charge.

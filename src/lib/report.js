@@ -213,8 +213,8 @@ export async function buildReport({ mode, anchor, data }) {
       t.mode,
       t.hotels.map((h) => `${h.name} (${kg1(h.kg)})`).join(', ') + (t.note ? `\n${t.note}` : ''),
       kg1(t.kg),
-      rs(t.cost),
-      t.kg ? rk(t.perKg) : '-'
+      t.cost > 0 ? rs(t.cost) : 'Pending',
+      t.kg && t.cost > 0 ? rk(t.perKg) : '-'
     ])
     const lump = sum(rows, (r) => r.legacyPorter)
     if (lump > 0) body.push([...(multi ? [''] : []), 'Porter', 'Lump sum, not split by hotel', '', rs(lump), ''])
@@ -225,7 +225,9 @@ export async function buildReport({ mode, anchor, data }) {
       foot: [[...(multi ? [''] : []), 'Total hired', '', kg1(tripKg), rs(tripCost + lump), tripKg ? rk(tripCost / tripKg) : '-']],
       columnStyles: { [k + 2]: { halign: 'right' }, [k + 3]: { halign: 'right' }, [k + 4]: { halign: 'right' }, [k + 1]: { cellWidth: land ? 150 : 80 } }
     })
+    const noCharge = trips.filter((t) => !(t.cost > 0)).length
     paragraph([
+      noCharge ? `${noCharge} vehicle trip${noCharge === 1 ? ' has' : 's have'} no charge entered yet, so the totals below will rise when it is added.` : '',
       `Hired vehicles: ${rs(tripCost)} for ${kg1(tripKg)}${tripKg ? ` = ${rk(tripCost / tripKg)} per kg` : ''} (${rs(tripCost)} / ${Math.round(tripKg * 10) / 10} kg).`,
       T.kg ? `All delivery expense: ${rs(T.logistics)} / ${Math.round(T.kg * 10) / 10} kg = ${rk(T.logistics / T.kg)} per kg.` : ''
     ].filter(Boolean))

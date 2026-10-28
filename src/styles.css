@@ -502,3 +502,8 @@ tfoot td { font-weight: 800; border-top: 2px solid var(--stroke); }
 .seq.bad { background: var(--neg); color: #fff; }
 .live-code b { font-size: 18px; letter-spacing: .15em; margin-left: 4px; }
 .live-ret { padding-top: 10px; border-top: 1px dashed var(--stroke); }
+.trip-search { width: 100%; }
+.trip-quick { margin-top: 6px; align-items: center; flex-wrap: wrap; }
+.trip-quick input { width: 130px; height: 40px; }
+.trip-add { margin-top: 6px; align-self: flex-start; }
+.chip.drv.warn { background: rgba(255,181,71,.2); color: var(--warn); }
