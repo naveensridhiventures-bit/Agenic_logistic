@@ -91,3 +91,8 @@ After updating `Code.gs`: paste it, run `setup` once (creates the Tracking tab a
 - The driver's **Route** button shows the whole route without locks: stretch, a sketch map, every hotel name in order with its status, and QR codes / buttons that open the full route in Google Maps.
 
 **Porter quick flow:** Daily Entry → Hired vehicles → Add vehicle. Pick the vehicle, search and tick the hotels, and save. The charge can stay empty and be added later with *Enter charge* (marked "pending" until then). The PDF shows "Pending" for trips with no charge.
+
+## Driver link, live summary and date-wise delivery reports
+- Routes page now shows the **driver app link** banner on top (Copy, WhatsApp, QR, Drivers & PINs).
+- **Live status** has a summary strip: Total / Done / Kg / Bill / Collected / Pending, plus per-driver stop status, remarks and voice notes.
+- **Date-wise reports** tab: last 7/14/30 days, tap a day to open it in Live status; download or share the delivery report PDF (summary by date + every stop with status, time, payment, remark).

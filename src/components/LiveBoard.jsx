@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { useApp } from '../store'
 import * as api from '../lib/api'
 import { routesForDate } from '../lib/routing'
+import { dayLog } from '../lib/deliveryLog'
 import { unlockCode, stopKey, returnKey } from '../lib/unlock'
 import { cx, inr, kgf, todayStr } from '../lib/util'
 import { Empty, Icon, rise, stagger } from './ui'
@@ -51,6 +52,7 @@ function UnlockCode({ k, label = 'Unlock code' }) {
 export default function LiveBoard() {
   const { data, date, pull } = useApp()
   const { drivers, routes } = useMemo(() => routesForDate(date, data), [data, date])
+  const L = useMemo(() => dayLog(date, data), [data, date])
   const trk = useMemo(() => new Map((data.tracking || []).map((t) => [t.id, t])), [data.tracking])
 
   useEffect(() => {
@@ -61,7 +63,24 @@ export default function LiveBoard() {
   const active = drivers.filter((d) => routes[d.id].length)
   if (!active.length) return <Empty icon="truck" title="No routes to follow" text="Assign orders to drivers on the Plan tab. Their live progress shows here once they log in." />
 
+  const stats = [
+    ['Total', L.orders, ''],
+    ['Done', L.done, 'pos'],
+    ['Kg', `${Math.round(L.kg * 10) / 10}kg`, ''],
+    ['Bill', inr(L.bill), ''],
+    ['Collected', inr(L.collected), 'pos'],
+    ['Pending', inr(L.pending), L.pending > 0 ? 'neg' : '']
+  ]
   return (
+    <motion.div className="live-wrap" variants={stagger} initial="hidden" animate="show">
+    <motion.div variants={rise} className="live-stats">
+      {stats.map(([k, v, tone]) => (
+        <div key={k} className={cx('live-stat', tone)}>
+          <small>{k}</small>
+          <b>{v}</b>
+        </div>
+      ))}
+    </motion.div>
     <motion.div className="live-grid" variants={stagger} initial="hidden" animate="show">
       {active.map((d) => {
         const stops = routes[d.id].map((s) => ({ ...s, t: trk.get(s.id) || {} }))
@@ -136,6 +155,7 @@ export default function LiveBoard() {
           </motion.section>
         )
       })}
+    </motion.div>
     </motion.div>
   )
 }

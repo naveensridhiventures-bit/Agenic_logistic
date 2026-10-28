@@ -5,6 +5,8 @@ import { unitCostOf } from '../lib/calc'
 import { dieselFor, fmtDur, hasLL, mapsLinks, optimizeOrder, osrmOrder, routeMetrics } from '../lib/geo'
 import { autoAllocate, driverStart, loadOf, placeStop, renumber, routesForDate, suggest, toRows } from '../lib/routing'
 import LiveBoard from '../components/LiveBoard'
+import DriverLinkCard from '../components/DriverLinkCard'
+import DeliveryHistory from '../components/DeliveryHistory'
 import { cx, inr, kgf, sum } from '../lib/util'
 import { DateNav, Empty, Icon, Num, rise, stagger, Tilt } from '../components/ui'
 import RouteMap from '../components/RouteMap'
@@ -130,7 +132,7 @@ function Lane({ driver, color, stops, dueBy, data, onSave, onMove, onUnassign, o
 }
 
 export default function Routes() {
-  const { data, dues, date, upsertMany, setAssignFor, setDriversOpen, toast } = useApp()
+  const { data, dues, date, setDate, upsertMany, setAssignFor, setDriversOpen, toast } = useApp()
   const [view, setView] = useState('plan')
   const [locOpen, setLocOpen] = useState(false)
   const [optimizing, setOptimizing] = useState('')
@@ -199,7 +201,7 @@ export default function Routes() {
 
   const toggle = (
     <div className="seg">
-      {[['plan', 'Plan'], ['live', 'Live status']].map(([k, label]) => (
+      {[['plan', 'Plan'], ['live', 'Live status'], ['hist', 'Date-wise reports']].map(([k, label]) => (
         <button key={k} type="button" className={cx(view === k && 'on')} onClick={() => setView(k)}>
           {view === k && <motion.i layoutId="routeseg" className="seg-pill" transition={{ type: 'spring', damping: 26, stiffness: 320 }} />}
           <span>{label}</span>
@@ -207,9 +209,22 @@ export default function Routes() {
       ))}
     </div>
   )
+  if (view === 'hist')
+    return (
+      <motion.div className="stack" variants={stagger} initial="hidden" animate="show">
+        <DriverLinkCard />
+        <motion.div variants={rise}>{toggle}</motion.div>
+        <motion.div variants={rise}>
+          <h2 className="h1">Date-wise delivery reports</h2>
+          <p className="muted">Delivered or not, money collected and notes for every day. Tap a day to see each stop and play voice notes.</p>
+        </motion.div>
+        <DeliveryHistory onOpenDay={(d) => { setDate(d); setView('live') }} />
+      </motion.div>
+    )
   if (view === 'live')
     return (
       <motion.div className="stack" variants={stagger} initial="hidden" animate="show">
+        <DriverLinkCard />
         <motion.div variants={rise} className="row between wrap">
           <div>
             <h2 className="h1">Live status</h2>
@@ -224,6 +239,7 @@ export default function Routes() {
 
   return (
     <motion.div className="stack" variants={stagger} initial="hidden" animate="show">
+      <DriverLinkCard />
       <motion.div variants={rise}>{toggle}</motion.div>
       <motion.div variants={rise} className="row between wrap">
         <div>
