@@ -16,7 +16,7 @@ const SCHEMA = {
   deliveries: { tab: 'Deliveries', cols: ['id', 'date', 'customerId', 'customerName', 'qty', 'rate', 'cost', 'amount', 'note', 'driverId', 'seq'], text: ['id', 'date', 'customerId', 'driverId'] },
   costs: { tab: 'DayCosts', cols: ['id', 'date', 'driver', 'diesel', 'porter', 'other', 'porterBooked', 'note'], text: ['id', 'date'] },
   payments: { tab: 'Payments', cols: ['id', 'date', 'customerId', 'customerName', 'amount', 'mode', 'note'], text: ['id', 'date', 'customerId'] },
-  drivers: { tab: 'Drivers', cols: ['id', 'name', 'phone', 'vehicle', 'capacityKg', 'startAddress', 'startLat', 'startLng', 'stretch', 'active'], text: ['id', 'phone'] },
+  drivers: { tab: 'Drivers', cols: ['id', 'name', 'phone', 'vehicle', 'capacityKg', 'startAddress', 'startLat', 'startLng', 'stretch', 'active', 'baseRoute'], text: ['id', 'phone', 'baseRoute'] },
   settings: { tab: 'Settings', cols: ['key', 'value'], text: [] }
 };
 

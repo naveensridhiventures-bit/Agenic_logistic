@@ -65,3 +65,5 @@ The ₹40 selling rate already carries manufacturing and other costs, so you onl
 - **Driver PDF / All drivers PDF**: big stop numbers, sketch map, quantity, amount to collect, tap-to-open Google Maps buttons, tick boxes and QR codes.
 
 After updating `Code.gs`: run `setup` once (adds the Drivers tab and new columns), then Deploy → New version.
+
+**Regular route:** in Drivers → edit, paste the route list he drives now (kg is ignored). New orders are suggested by how far they take him off that route; hotels already on it go to him automatically, in his order.

@@ -1,17 +1,34 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useApp } from '../store'
-import { geocodeCustomer, nominatim, parseLocation } from '../lib/geo'
+import { nominatim, parseLocation } from '../lib/geo'
+import { parseRoute, routesForDate } from '../lib/routing'
 import { todayStr, uid } from '../lib/util'
 import { Empty, Field, Icon, Modal } from './ui'
 
-const blank = { id: null, name: '', phone: '', vehicle: '', capacityKg: '', startAddress: '', stretch: '', active: true }
+const blank = { id: null, name: '', phone: '', vehicle: '', capacityKg: '', startAddress: '', stretch: '', baseRoute: '', active: true }
 
 export default function DriverModal() {
   const { data, driversOpen, setDriversOpen, upsert, upsertMany, remove, toast } = useApp()
   const [edit, setEdit] = useState(null)
   const [saving, setSaving] = useState(false)
   const drivers = data.drivers
+  const [paste, setPaste] = useState('')
+  const baseIds = edit ? String(edit.baseRoute || '').split(',').filter(Boolean) : []
+  const cName = (id) => data.customers.find((c) => c.id === id)?.name || id
+  const readPaste = () => {
+    const r = parseRoute(paste, data.customers)
+    if (!r.ids.length) return toast('No hotels matched. Paste the list with names and lat,lng lines.', 'warn')
+    setEdit({ ...edit, baseRoute: r.ids.join(',') })
+    setPaste('')
+    toast(`${r.ids.length} of ${r.total} hotels matched${r.unmatched.length ? ` - not found: ${r.unmatched.slice(0, 4).join(', ')}${r.unmatched.length > 4 ? '...' : ''}` : ''}`, r.unmatched.length ? 'warn' : 'ok')
+  }
+  const fromToday = () => {
+    const { routes } = routesForDate(todayStr(), data)
+    const ids = (routes[edit.id] || []).map((s) => s.customerId)
+    if (!ids.length) return toast('No orders are assigned to this driver today yet', 'warn')
+    setEdit({ ...edit, baseRoute: ids.join(',') })
+  }
 
   const close = () => {
     setEdit(null)
@@ -54,6 +71,7 @@ export default function DriverModal() {
       startLat,
       startLng,
       stretch: edit.stretch.trim(),
+      baseRoute: edit.baseRoute || '',
       active: edit.active
     })
     setSaving(false)
@@ -134,6 +152,30 @@ export default function DriverModal() {
             <Field label="Current route stretch" hint="Areas / road he is covering now, comma separated. New orders in these areas are suggested to him first.">
               <input value={edit.stretch} onChange={(e) => setEdit({ ...edit, stretch: e.target.value })} placeholder="OMR, Sholinganallur, Perungudi, Thoraipakkam" />
             </Field>
+            <Field label="Regular route (in order)" hint="The route he drives now, with kg ignored. Paste the list (name + lat,lng lines), or copy today's route. New orders are suggested by how little they take him off this route.">
+              <textarea rows={3} value={paste} onChange={(e) => setPaste(e.target.value)} placeholder="Paste route list here…" />
+            </Field>
+            <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+              <button type="button" className="btn ghost" onClick={readPaste} disabled={!paste.trim()}>
+                Read pasted route
+              </button>
+              {edit.id && (
+                <button type="button" className="btn ghost" onClick={fromToday}>
+                  Use today's route
+                </button>
+              )}
+              {baseIds.length > 0 && (
+                <button type="button" className="btn ghost" onClick={() => setEdit({ ...edit, baseRoute: '' })}>
+                  Clear
+                </button>
+              )}
+            </div>
+            {baseIds.length > 0 && (
+              <small className="muted">
+                {baseIds.length} stops: {baseIds.slice(0, 6).map(cName).join(' › ')}
+                {baseIds.length > 6 ? ' › …' : ''}
+              </small>
+            )}
             <Field label="Start point" hint="Address, Google Maps link, lat,lng or plus code. Where he loads / begins the day.">
               <input value={edit.startAddress} onChange={(e) => setEdit({ ...edit, startAddress: e.target.value })} placeholder="Agenic kitchen, Perungudi" />
             </Field>

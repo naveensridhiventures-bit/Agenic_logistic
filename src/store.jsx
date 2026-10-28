@@ -67,6 +67,7 @@ function normalize(raw) {
       ...d,
       id: String(d.id),
       capacityKg: num(d.capacityKg),
+      baseRoute: String(d.baseRoute || ''),
       startLat: ll(d.startLat),
       startLng: ll(d.startLng),
       active: d.active === false || String(d.active).toUpperCase() === 'FALSE' ? false : true
