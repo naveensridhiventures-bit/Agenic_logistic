@@ -1,3 +1,4 @@
+import { parseLocation } from './geo'
 // Small CSV / pasted-spreadsheet parser for the bulk customer import.
 export function parseCSV(text) {
   const first = text.split(/\r?\n/)[0] || ''
@@ -42,11 +43,13 @@ const ALIAS = {
   email: ['email', 'mail', 'emailid', 'emailaddress'],
   rate: ['rate', 'price', 'rateperkg', 'priceperkg'],
   creditLimit: ['creditlimit', 'limit', 'credit'],
-  maxDays: ['maxdays', 'maxunpaiddays', 'days', 'unpaiddays']
+  maxDays: ['maxdays', 'maxunpaiddays', 'days', 'unpaiddays'],
+  profit: ['profit', 'profitperkg', 'margin', 'marginperkg', 'myprofit'],
+  location: ['latlng', 'coordinates', 'coords', 'latlong']
 }
 const num = (v) => Number(String(v ?? '').replace(/[₹,\s]/g, '')) || 0
 
-export const TEMPLATE = 'name,phone,address,area,email,rate,creditLimit,maxDays\n'
+export const TEMPLATE = 'name,phone,address,area,email,rate,profit,creditLimit,maxDays\n'
 export const mapUrl = (address) =>
   address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}` : ''
 
@@ -95,6 +98,7 @@ export function customersFromRows(rows, defaults = {}) {
     if (!raw) return errors.push(`Row ${i + 2}: name is empty - skipped`)
     const { name, rate: nameRate } = splitNamePrice(raw)
     const address = get(r, 'address')
+    const loc = parseLocation(get(r, 'location')) || parseLocation(address)
     out.push({
       name: titleCase(name),
       area: get(r, 'area') || areaFromAddress(address),
@@ -103,6 +107,10 @@ export function customersFromRows(rows, defaults = {}) {
       address,
       mapUrl: mapUrl(address),
       rate: num(get(r, 'rate')) || nameRate || defaults.rate || 0,
+      profitPerKg: num(get(r, 'profit')),
+      lat: loc ? loc.lat : null,
+      lng: loc ? loc.lng : null,
+      locSource: loc ? loc.source : '',
       creditLimit: num(get(r, 'creditLimit')),
       maxDays: num(get(r, 'maxDays')),
       active: true

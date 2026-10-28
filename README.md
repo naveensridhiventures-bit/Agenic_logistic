@@ -52,3 +52,16 @@ Notes: Gmail allows about 100 emails a day for a normal account (1,500 for Works
 - **Orders** tab → switch **Day / Week / Month**, move with the arrows, open any date to see each order's payment status, and download a **PDF report** or **CSV**.
 - Every PDF ends with the **pending customers** list (what each customer still owes, oldest bill, status) and sign-off lines for management. Amounts in PDFs print as "Rs." because the built-in PDF font has no rupee sign.
 - Payment status is worked out by clearing each customer's oldest bills first.
+
+## Profit per kg
+
+The ₹40 selling rate already carries manufacturing and other costs, so you only enter **your profit per kg**. Set it per customer (Customers → edit, or **Rates & profit** for a table of all hotels), with a default in Settings. Day result = Σ(kg × profit) − delivery expenses (driver, diesel, porter, other).
+
+## Routes & drivers
+
+- **Routes tab → Drivers**: add each driver with vehicle, capacity, start point and their current **stretch** (areas they cover).
+- New orders are suggested a driver by extra km, stretch/area match and load. One tap assigns; **Choose…** lets you override and pick the position. Drag the handle to reorder, **Optimize** to re-sequence, **Auto-allocate** to place all waiting orders.
+- Give each hotel a map location (paste a Google Maps link, `lat,lng` or plus code) or use **Find locations**. Suggestions are only as accurate as the saved locations.
+- **Driver PDF / All drivers PDF**: big stop numbers, sketch map, quantity, amount to collect, tap-to-open Google Maps buttons, tick boxes and QR codes.
+
+After updating `Code.gs`: run `setup` once (adds the Drivers tab and new columns), then Deploy → New version.

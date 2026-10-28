@@ -15,7 +15,7 @@ export default function Settings() {
     e.preventDefault()
     saveSettings({
       ...s,
-      costPerKg: Number(s.costPerKg) || 0,
+      defaultProfitPerKg: Number(s.defaultProfitPerKg) || 0,
       defaultRate: Number(s.defaultRate) || 0,
       driverPerDay: Number(s.driverPerDay) || 0,
       maxUnpaidDays: Number(s.maxUnpaidDays) || 0,
@@ -43,7 +43,7 @@ export default function Settings() {
     <motion.div className="stack" variants={stagger} initial="hidden" animate="show">
       <motion.div variants={rise}>
         <h2 className="h1">Settings</h2>
-        <p className="muted">Batter cost, alert rules and your Google Sheet connection.</p>
+        <p className="muted">Profit, alert rules and your Google Sheet connection.</p>
       </motion.div>
 
       <div className="grid2 top">
@@ -53,8 +53,8 @@ export default function Settings() {
             <input value={s.company} onChange={(e) => set('company', e.target.value)} />
           </Field>
           <div className="two">
-            <Field label="Batter cost per kg (₹)" hint="Your making cost - used for profit">
-              <input type="number" inputMode="decimal" value={s.costPerKg} onChange={(e) => set('costPerKg', e.target.value)} />
+            <Field label="Default profit per kg (₹)" hint="Your profit after all costs. Set per customer in Customers → Rates & profit">
+              <input type="number" inputMode="decimal" value={s.defaultProfitPerKg} onChange={(e) => set('defaultProfitPerKg', e.target.value)} />
             </Field>
             <Field label="Default selling rate (₹/kg)">
               <input type="number" inputMode="decimal" value={s.defaultRate} onChange={(e) => set('defaultRate', e.target.value)} />

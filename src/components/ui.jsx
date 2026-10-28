@@ -35,6 +35,8 @@ const PATHS = {
   box: '<path d="M4 8l8-4 8 4v8l-8 4-8-4z"/><path d="M4 8l8 4 8-4M12 12v8"/>',
   pin: '<path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>',
   phone: '<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/>',
+  route: '<circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7.5a3.5 3.5 0 0 0 0-7h-7a3.5 3.5 0 0 1 0-7H16"/>',
+  grip: '<circle cx="9" cy="6" r="1.2"/><circle cx="15" cy="6" r="1.2"/><circle cx="9" cy="12" r="1.2"/><circle cx="15" cy="12" r="1.2"/><circle cx="9" cy="18" r="1.2"/><circle cx="15" cy="18" r="1.2"/>',
   bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 21h4"/>'
 }
 export function Icon({ name, size = 20, className, stroke = 1.9 }) {
@@ -201,21 +203,22 @@ export function Ring({ value, size = 64, status = 'ok', children }) {
   )
 }
 
-export function DateNav() {
+export function DateNav({ future = 0 }) {
   const { date, setDate } = useApp()
   const today = todayStr()
+  const max = addDays(today, future)
   return (
     <div className="datenav">
       <button className="icon-btn" onClick={() => setDate(addDays(date, -1))} aria-label="Previous day">
         <Icon name="left" size={18} />
       </button>
       <label className="date-pill">
-        <span>{date === today ? 'Today' : fmtDate(date, { weekday: 'short', day: 'numeric', month: 'short' })}</span>
-        <input type="date" value={date} max={today} onChange={(e) => e.target.value && setDate(e.target.value)} />
+        <span>{date === today ? 'Today' : date === addDays(today, 1) ? 'Tomorrow' : fmtDate(date, { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+        <input type="date" value={date} max={max} onChange={(e) => e.target.value && setDate(e.target.value)} />
       </label>
       <button
         className="icon-btn"
-        disabled={date >= today}
+        disabled={date >= max}
         onClick={() => setDate(addDays(date, 1))}
         aria-label="Next day"
       >

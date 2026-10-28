@@ -173,7 +173,7 @@ export default function Orders() {
                   </div>
                   <div className="ometa">
                     <b>{kgf(r.kg)} · {r.count} order{r.count === 1 ? '' : 's'}</b>
-                    <small>Sales {inr(r.revenue)} · Expense {inr(r.logistics)}</small>
+                    <small>Sales {inr(r.revenue)} · Profit {inr(r.margin)} · Expense {inr(r.logistics)}</small>
                   </div>
                   <div className="oright">
                     <span className={cx('net-chip', r.net >= 0 ? 'pos' : 'neg')}>{inr(r.net, true)}</span>
@@ -215,7 +215,7 @@ export default function Orders() {
                         <div key={d.id} className="ditem">
                           <div className="li-main">
                             <b>{d.customerName}</b>
-                            <small>{kgf(d.qty)} × {inr(d.rate)}</small>
+                            <small>{kgf(d.qty)} × {inr(d.rate)} · profit <span className={d.profit >= 0 ? 'pos' : 'neg'}>{inr(d.profit, true)}</span></small>
                           </div>
                           <b>{inr(d.pay.amount)}</b>
                           <span className={cx('chip', PAY_CHIP[d.pay.status])}>{d.pay.status === 'part' ? `${inr(d.pay.due)} due` : PAY_LABEL[d.pay.status]}</span>

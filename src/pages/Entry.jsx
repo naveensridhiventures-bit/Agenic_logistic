@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useApp } from '../store'
-import { dayStats, deliveryPayStatus, PAY_CHIP, PAY_LABEL } from '../lib/calc'
-import { cx, inr, kgf, uid } from '../lib/util'
+import { costFor, dayStats, deliveryPayStatus, PAY_CHIP, PAY_LABEL, unitCostOf } from '../lib/calc'
+import { cx, inr, kgf, todayStr, uid } from '../lib/util'
 import { DateNav, Empty, Field, Icon, Num, rise, stagger } from '../components/ui'
 
-const blank = { id: null, customerId: '', qty: '', rate: '', paid: false, mode: 'Cash' }
+const blank = { id: null, customerId: '', qty: '', rate: '', profit: '', paid: false, mode: 'Cash' }
+const r2 = (n) => Math.round(n * 100) / 100
 
 export default function Entry() {
-  const { data, date, upsert, remove, toast, setTab } = useApp()
+  const { data, date, upsert, remove, toast, setTab, setAssignFor } = useApp()
   const { settings } = data
   const s = useMemo(() => dayStats(date, data), [data, date])
   const customers = data.customers.filter((c) => c.active !== false)
@@ -23,14 +24,20 @@ export default function Entry() {
   const qty = Number(f.qty) || 0
   const rate = Number(f.rate) || 0
   const amount = qty * rate
-  const editing = todays.find((d) => d.id === f.id)
-  const unitCost = editing?.cost || settings.costPerKg
-  const lineMargin = qty * (rate - unitCost)
+  const profit = Number(f.profit) || 0
+  const unitCost = Math.max(0, rate - profit) // cost stays fixed if you change the rate, so profit moves with it
+  const lineMargin = qty * profit
 
   const pickCustomer = (id) => {
     const c = data.customers.find((x) => x.id === id)
-    setF((p) => ({ ...p, customerId: id, rate: c ? c.rate : '' }))
+    const r = c ? c.rate || settings.defaultRate : ''
+    setF((p) => ({ ...p, customerId: id, rate: r, profit: c ? r2(Math.max(0, r - costFor(c, settings, r))) || '' : '' }))
   }
+  const onRate = (v) =>
+    setF((p) => {
+      const delta = (Number(v) || 0) - (Number(p.rate) || 0)
+      return { ...p, rate: v, profit: p.profit === '' ? '' : r2((Number(p.profit) || 0) + delta) }
+    })
   const addDelivery = (e) => {
     e.preventDefault()
     if (!cust || qty <= 0 || rate <= 0) return toast('Choose a customer, quantity and rate', 'warn')
@@ -58,8 +65,10 @@ export default function Entry() {
       })
     toast(f.id ? 'Delivery updated' : `Added ${kgf(qty)} for ${cust.name}${f.paid ? ' (paid)' : ''}`)
     setF(blank)
+    if (!f.id && data.drivers.some((x) => x.active !== false) && date >= todayStr()) setAssignFor(row.id)
   }
-  const edit = (d) => setF({ id: d.id, customerId: d.customerId, qty: d.qty, rate: d.rate, paid: false, mode: 'Cash' })
+  const edit = (d) =>
+    setF({ id: d.id, customerId: d.customerId, qty: d.qty, rate: d.rate, profit: r2(d.rate - unitCostOf(d, data)), paid: false, mode: 'Cash' })
 
   // ---------- day cost form ----------
   const initCost = () => ({
@@ -132,7 +141,7 @@ export default function Entry() {
           <h2 className="h1">Daily entry</h2>
           <p className="muted">Record deliveries and what it cost to deliver them.</p>
         </div>
-        <DateNav />
+        <DateNav future={3} />
       </motion.div>
 
       {customers.length === 0 && (
@@ -144,11 +153,11 @@ export default function Entry() {
         </motion.div>
       )}
 
-      {Number(settings.costPerKg) === 0 && (
+      {Number(settings.defaultProfitPerKg) === 0 && Number(settings.costPerKg) === 0 && !data.customers.some((c) => Number(c.profitPerKg) > 0) && (
         <motion.div variants={rise} className="preview">
-          <span>Batter cost per kg is not set, so profit is overstated.</span>
-          <button type="button" className="link" onClick={() => setTab('set')}>
-            Set it in Settings
+          <span>Profit per kg is not set for your customers, so profit shows as the full sale amount.</span>
+          <button type="button" className="link" onClick={() => setTab('cust')}>
+            Set it in Customers
           </button>
         </motion.div>
       )}
@@ -163,7 +172,7 @@ export default function Entry() {
         </div>
         <div className="live-mid">
           <span>Sales {inr(s.revenue)}</span>
-          <span>Batter {inr(-s.batter)}</span>
+          <span>Cost {inr(-s.batter)}</span>
           <span>Delivery {inr(-logistics)}</span>
         </div>
         <span className="live-tag">{liveNet >= 0 ? 'PROFIT' : 'LOSS'}</span>
@@ -186,7 +195,7 @@ export default function Entry() {
                 ))}
               </select>
             </Field>
-            <div className="two">
+            <div className="three">
               <Field label="Quantity (kg)">
                 <input type="number" inputMode="decimal" min="0" step="0.5" value={f.qty} onChange={(e) => setF({ ...f, qty: e.target.value })} placeholder="0" />
               </Field>
@@ -194,7 +203,10 @@ export default function Entry() {
                 label="Rate per kg (₹)"
                 hint={cust && rate !== cust.rate ? `${rate - cust.rate > 0 ? '+' : ''}${rate - cust.rate} vs usual ${inr(cust.rate)}` : 'Change for special price'}
               >
-                <input type="number" inputMode="decimal" min="0" value={f.rate} onChange={(e) => setF({ ...f, rate: e.target.value })} placeholder="0" />
+                <input type="number" inputMode="decimal" min="0" value={f.rate} onChange={(e) => onRate(e.target.value)} placeholder="0" />
+              </Field>
+              <Field label="My profit / kg (₹)" hint="after all costs">
+                <input type="number" inputMode="decimal" value={f.profit} onChange={(e) => setF({ ...f, profit: e.target.value })} placeholder="0" />
               </Field>
             </div>
 
@@ -210,7 +222,7 @@ export default function Entry() {
                     Bill <b>{inr(amount)}</b>
                   </span>
                   <span className={lineMargin >= 0 ? 'pos' : 'neg'}>
-                    Batter margin <b>{inr(lineMargin, true)}</b>
+                    My profit <b>{inr(lineMargin, true)}</b>
                   </span>
                 </motion.div>
               )}
@@ -248,7 +260,8 @@ export default function Entry() {
           <div className="list">
             <AnimatePresence initial={false}>
               {todays.map((d) => {
-                const m = d.qty * (d.rate - (d.cost || settings.costPerKg))
+                const m = d.qty * (d.rate - unitCostOf(d, data))
+                const drv = data.drivers.find((x) => x.id === d.driverId)
                 return (
                   <motion.div
                     key={d.id}
@@ -262,11 +275,14 @@ export default function Entry() {
                     <div className="li-main">
                       <b>{d.customerName}</b>
                       <small>
-                        {kgf(d.qty)} × {inr(d.rate)} · margin <span className={m >= 0 ? 'pos' : 'neg'}>{inr(m, true)}</span>
+                        {kgf(d.qty)} × {inr(d.rate)} · profit <span className={m >= 0 ? 'pos' : 'neg'}>{inr(m, true)}</span>
                       </small>
                     </div>
                     <b>{inr(d.qty * d.rate)}</b>
                     <span className={`chip ${PAY_CHIP[pay[d.id]?.status || 'pending']}`}>{PAY_LABEL[pay[d.id]?.status || 'pending']}</span>
+                    <button type="button" className={cx('chip drv', drv ? 'clear' : 'warn')} onClick={() => setAssignFor(d.id)} title="Choose driver">
+                      {drv ? drv.name : 'Assign driver'}
+                    </button>
                     <button className="icon-btn" onClick={() => edit(d)} aria-label="Edit">
                       <Icon name="edit" size={16} />
                     </button>

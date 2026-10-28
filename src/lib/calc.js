@@ -4,11 +4,26 @@ export const DEFAULT_SETTINGS = {
   company: 'Agenic',
   costPerKg: 0, // what one kg of batter costs you to make - set in Settings
   defaultRate: 40, // default selling price per kg
+  defaultProfitPerKg: 0, // your profit per kg when a customer has none set
   driverPerDay: 0, // default driver salary pre-filled each day
   ownerEmail: '',
   maxUnpaidDays: 3, // warn when a customer's oldest bill is this many days old
   warnPercent: 80 // "near limit" threshold (% of credit limit)
 }
+
+/**
+ * Cost of one kg for a customer = selling rate - the profit per kg you set for that customer.
+ * (The Rs.40 price includes manufacturing and other costs; only the profit is entered.)
+ */
+export function costFor(customer, settings, rate) {
+  const r = Number(rate) || Number(customer?.rate) || Number(settings.defaultRate) || 0
+  const own = Number(customer?.profitPerKg) || 0
+  const p = own > 0 ? own : Number(settings.defaultProfitPerKg) || 0
+  if (p > 0) return Math.max(0, r - p)
+  return Number(settings.costPerKg) || 0
+}
+export const unitCostOf = (d, data) =>
+  Number(d.cost) || costFor(data.customers.find((c) => c.id === d.customerId), data.settings, d.rate)
 
 /** Profit / loss for one day. */
 export function dayStats(date, data) {
@@ -16,7 +31,7 @@ export function dayStats(date, data) {
   const ds = deliveries.filter((d) => d.date === date)
   const kg = sum(ds, (d) => d.qty)
   const revenue = sum(ds, (d) => d.qty * d.rate)
-  const batter = sum(ds, (d) => d.qty * (d.cost || settings.costPerKg))
+  const batter = sum(ds, (d) => d.qty * unitCostOf(d, data))
   const c = costs.find((x) => x.date === date) || {}
   const driver = Number(c.driver) || 0
   const diesel = Number(c.diesel) || 0
@@ -65,7 +80,8 @@ export function trendData(data, endDate, days = 7) {
  * so "days unpaid" always means the age of the oldest bill that is still open.
  */
 export function computeDues(data, asOf = todayStr()) {
-  const { customers, deliveries, payments, settings } = data
+  const { customers, payments, settings } = data
+  const deliveries = data.deliveries.filter((d) => d.date <= asOf)
   const rows = customers
     .filter((c) => c.active !== false)
     .map((c) => {
@@ -157,7 +173,7 @@ export function buildReminder(item, settings) {
 export function deliveryPayStatus(data) {
   const out = {}
   const byC = {}
-  data.deliveries.forEach((d) => (byC[d.customerId] ||= []).push(d))
+  data.deliveries.filter((d) => d.date <= todayStr()).forEach((d) => (byC[d.customerId] ||= []).push(d))
   const paidBy = {}
   data.payments.forEach((p) => (paidBy[p.customerId] = (paidBy[p.customerId] || 0) + (Number(p.amount) || 0)))
   for (const [cid, ds] of Object.entries(byC)) {
@@ -215,6 +231,7 @@ export function periodRows(start, end, data, pay) {
     const due = sum(deliveries, (x) => x.pay.due)
     const status = !deliveries.length ? 'none' : due <= 0.5 ? 'paid' : paid > 0.5 ? 'part' : 'pending'
     const cost = data.costs.find((c) => c.date === d)
+    deliveries.forEach((x) => (x.profit = x.qty * (x.rate - unitCostOf(x, data))))
     rows.push({ ...s, deliveries, billed, paid, due, status, costNote: cost?.note || '' })
   }
   return rows

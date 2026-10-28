@@ -15,6 +15,7 @@ const emptyData = () => ({
   deliveries: [],
   costs: [],
   payments: [],
+  drivers: [],
   settings: { ...DEFAULT_SETTINGS },
   reminders: {}
 })
@@ -38,6 +39,7 @@ const loadQueue = () => {
 
 function normalize(raw) {
   const num = (v) => (v === '' || v == null ? 0 : Number(v))
+  const ll = (v) => (v === '' || v == null || !Number.isFinite(Number(v)) ? null : Number(v))
   return {
     customers: (raw.customers || []).map((c) => ({
       ...c,
@@ -45,6 +47,10 @@ function normalize(raw) {
       rate: num(c.rate),
       creditLimit: num(c.creditLimit),
       maxDays: num(c.maxDays),
+      profitPerKg: num(c.profitPerKg),
+      lat: ll(c.lat),
+      lng: ll(c.lng),
+      locSource: c.locSource || '',
       active: c.active === false || String(c.active).toUpperCase() === 'FALSE' ? false : true
     })),
     deliveries: (raw.deliveries || []).map((d) => ({
@@ -53,7 +59,17 @@ function normalize(raw) {
       customerId: String(d.customerId),
       qty: num(d.qty),
       rate: num(d.rate),
-      cost: num(d.cost)
+      cost: num(d.cost),
+      driverId: d.driverId ? String(d.driverId) : '',
+      seq: num(d.seq)
+    })),
+    drivers: (raw.drivers || []).map((d) => ({
+      ...d,
+      id: String(d.id),
+      capacityKg: num(d.capacityKg),
+      startLat: ll(d.startLat),
+      startLng: ll(d.startLng),
+      active: d.active === false || String(d.active).toUpperCase() === 'FALSE' ? false : true
     })),
     costs: (raw.costs || []).map((c) => ({
       ...c,
@@ -97,6 +113,8 @@ export function AppProvider({ children }) {
   const [date, setDate] = useState(todayStr())
   const [tab, setTab] = useState('dash')
   const [popup, setPopup] = useState(false)
+  const [driversOpen, setDriversOpen] = useState(false)
+  const [assignFor, setAssignFor] = useState(null) // delivery id being assigned
   const [toasts, setToasts] = useState([])
   const queue = useRef(loadQueue())
   const flushing = useRef(false)
@@ -245,6 +263,10 @@ export function AppProvider({ children }) {
     setTab,
     popup,
     setPopup,
+    driversOpen,
+    setDriversOpen,
+    assignFor,
+    setAssignFor,
     toasts,
     toast,
     upsert,

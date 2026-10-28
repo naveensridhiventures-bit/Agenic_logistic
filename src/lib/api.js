@@ -2,7 +2,7 @@
 const CFG = 'agenic.cfg'
 // Built-in backend. Can be overridden in Settings or with VITE_API_URL / VITE_API_KEY.
 const DEFAULT_URL =
-  'https://script.google.com/macros/s/AKfycbzV2gz1VbJr_flpXnONlN_OPsuhblhbq3y4BrNY5gzDnR08-7C3msz6MFcnmsg_-4xrFg/exec'
+  'https://script.google.com/macros/s/AKfycbxCs8th4RpTrPOXjpNOLO-EVbzEfaYt-uikOBWLabOJjml9mIPE3Z3oAQxU3WMGWhclEw/exec'
 const DEFAULT_KEY = 'change-me-to-your-secret' // must equal API_KEY in Code.gs
 
 export function getCfg() {

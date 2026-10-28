@@ -2,10 +2,11 @@ import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useApp } from '../store'
 import { cx, fmtDate, inr, uid } from '../lib/util'
+import { parseLocation } from '../lib/geo'
 import { customersFromRows, customersFromText, mapUrl, rowsFromXlsx, TEMPLATE } from '../lib/csv'
 import { Empty, Field, Icon, Modal, Num, rise, Ring, stagger, StatusChip, Tilt } from '../components/ui'
 
-const blank = { id: null, name: '', area: '', address: '', phone: '', email: '', rate: '', creditLimit: '', maxDays: '', active: true }
+const blank = { id: null, name: '', area: '', address: '', profitPerKg: '', locText: '', origLoc: '', locSource: '', phone: '', email: '', rate: '', creditLimit: '', maxDays: '', active: true }
 
 export default function Customers() {
   const { data, dues, upsert, upsertMany, sendReminder, toast } = useApp()
@@ -14,6 +15,32 @@ export default function Customers() {
   const [edit, setEdit] = useState(null)
   const [busy, setBusy] = useState({})
   const [imp, setImp] = useState(null) // { text } while the import dialog is open
+  const [rp, setRp] = useState(null) // rates & profit editor: { q, v: { [id]: {rate, profit} }, fill }
+  const rpRows = rp ? data.customers.filter((c) => c.active !== false && (!rp.q || `${c.name} ${c.area}`.toLowerCase().includes(rp.q.toLowerCase()))) : []
+  const rpSet = (id, k, val) => setRp((p) => ({ ...p, v: { ...p.v, [id]: { ...(p.v[id] || {}), [k]: val } } }))
+  const rpFill = () => {
+    const f = Number(rp.fill) || 0
+    if (!f) return toast('Enter the profit per kg to fill', 'warn')
+    const v = { ...rp.v }
+    data.customers.forEach((c) => {
+      const cur = v[c.id]?.profit ?? c.profitPerKg
+      if (!Number(cur)) v[c.id] = { ...(v[c.id] || {}), profit: String(f) }
+    })
+    setRp({ ...rp, v })
+  }
+  const rpSave = () => {
+    const rows = []
+    for (const [id, ch] of Object.entries(rp.v)) {
+      const cu = data.customers.find((x) => x.id === id)
+      if (!cu) continue
+      rows.push({ ...cu, rate: ch.rate !== undefined ? Number(ch.rate) || 0 : cu.rate, profitPerKg: ch.profit !== undefined ? Number(ch.profit) || 0 : cu.profitPerKg })
+    }
+    if (rows.length) {
+      upsertMany('customers', rows)
+      toast(`${rows.length} customer${rows.length > 1 ? 's' : ''} updated`)
+    }
+    setRp(null)
+  }
   const parsed = imp
     ? imp.sheet
       ? customersFromRows(imp.sheet, { rate: data.settings.defaultRate })
@@ -45,7 +72,9 @@ export default function Customers() {
     const rows = parsed.rows.map((r) => {
       const hit = (r.phone && byPhone.get(r.phone)) || (!r.phone && byName.get(r.name.toLowerCase()))
       hit ? updated++ : added++
-      return { ...r, id: hit?.id || uid() }
+      return hit
+        ? { ...hit, ...r, profitPerKg: r.profitPerKg || hit.profitPerKg, lat: r.lat ?? hit.lat, lng: r.lng ?? hit.lng, locSource: r.lat != null ? r.locSource : hit.locSource, id: hit.id }
+        : { ...r, id: uid() }
     })
     upsertMany('customers', rows)
     toast(`Imported ${added} new, ${updated} updated`)
@@ -69,12 +98,19 @@ export default function Customers() {
   const save = (e) => {
     e.preventDefault()
     if (!edit.name.trim() || !Number(edit.rate)) return toast('Name and rate are required', 'warn')
+    const txt = (edit.locText || '').trim()
+    const loc = txt ? parseLocation(txt) : null
+    if (txt && !loc) return toast('Could not read the map location. Paste a Google Maps link, "lat, lng" or a plus code.', 'warn')
     upsert('customers', {
       id: edit.id || uid(),
       name: edit.name.trim(),
       area: edit.area.trim(),
       address: (edit.address || '').trim(),
       mapUrl: mapUrl((edit.address || '').trim()),
+      profitPerKg: Number(edit.profitPerKg) || 0,
+      lat: loc ? loc.lat : null,
+      lng: loc ? loc.lng : null,
+      locSource: loc ? (txt === edit.origLoc ? edit.locSource || loc.source : 'manual') : '',
       phone: edit.phone.trim(),
       email: edit.email.trim(),
       rate: Number(edit.rate),
@@ -86,7 +122,7 @@ export default function Customers() {
     setEdit(null)
   }
   const open = (c) =>
-    setEdit(c ? { ...blank, ...c, rate: c.rate, creditLimit: c.creditLimit || '', maxDays: c.maxDays || '' } : { ...blank, rate: data.settings.defaultRate, maxDays: data.settings.maxUnpaidDays })
+    setEdit(c ? { ...blank, ...c, rate: c.rate, profitPerKg: c.profitPerKg || '', locText: c.lat != null ? `${c.lat}, ${c.lng}` : '', origLoc: c.lat != null ? `${c.lat}, ${c.lng}` : '', creditLimit: c.creditLimit || '', maxDays: c.maxDays || '' } : { ...blank, rate: data.settings.defaultRate, maxDays: data.settings.maxUnpaidDays })
 
   return (
     <motion.div className="stack" variants={stagger} initial="hidden" animate="show">
@@ -96,6 +132,9 @@ export default function Customers() {
           <p className="muted">Credit limits, dues and reminders for your hotels.</p>
         </div>
         <div className="row gap">
+          <button className="btn ghost" onClick={() => setRp({ q: '', v: {}, fill: '' })}>
+            <Icon name="edit" size={18} /> Rates &amp; profit
+          </button>
           <button className="btn ghost" onClick={() => setImp({ text: '' })}>
             <Icon name="download" size={18} /> Import
           </button>
@@ -169,6 +208,8 @@ export default function Customers() {
                   <span>Limit {d.limit ? inr(d.limit) : '—'}</span>
                   <span>Max {d.maxDays || '—'} days</span>
                   <span>Billed {inr(d.billed)}</span>
+                  <span className={c.profitPerKg > 0 ? 'pos' : 'warn'}>Profit {c.profitPerKg > 0 ? `${inr(c.profitPerKg)}/kg` : 'not set'}</span>
+                  {c.lat == null ? <span className="warn">No map location</span> : c.locSource === 'approx' ? <span className="warn">Check location</span> : null}
                 </div>
                 {d.reasons.length > 0 && (
                   <div className="reasons">
@@ -214,6 +255,66 @@ export default function Customers() {
         rows.length === 0 && <Empty icon="users" title="No customers match" text="Try another search or filter." />
       )}
       {inactive.length > 0 && <p className="muted tiny">{inactive.length} inactive customer(s) hidden.</p>}
+
+      <Modal open={!!rp} onClose={() => setRp(null)} wide>
+        {rp && (
+          <div className="form">
+            <div className="row between">
+              <h3 className="h3">
+                <Icon name="edit" size={18} /> Rates &amp; my profit per kg
+              </h3>
+              <button type="button" className="icon-btn" onClick={() => setRp(null)} aria-label="Close">
+                <Icon name="x" size={18} />
+              </button>
+            </div>
+            <p className="muted">
+              The selling rate includes manufacturing and other costs. Enter only <b>your profit per kg</b> for each customer; daily profit is worked out as kg × this profit, minus delivery expenses.
+            </p>
+            <div className="row gap wrap">
+              <label className="search" style={{ minWidth: 180 }}>
+                <Icon name="search" size={18} />
+                <input value={rp.q} onChange={(e) => setRp({ ...rp, q: e.target.value })} placeholder="Search" />
+              </label>
+              <input type="number" inputMode="decimal" className="mini" value={rp.fill} onChange={(e) => setRp({ ...rp, fill: e.target.value })} placeholder="₹ profit" />
+              <button type="button" className="btn ghost sm" onClick={rpFill}>
+                Fill empty profits
+              </button>
+            </div>
+            <div className="rp-table">
+              <div className="rp-head">
+                <span>Customer</span>
+                <span>Rate ₹/kg</span>
+                <span>My profit ₹/kg</span>
+                <span>Cost ₹/kg</span>
+              </div>
+              {rpRows.map((c) => {
+                const rate = rp.v[c.id]?.rate ?? c.rate
+                const pr = rp.v[c.id]?.profit ?? (c.profitPerKg || '')
+                const changed = rp.v[c.id] !== undefined
+                return (
+                  <div key={c.id} className={cx('rp-row', changed && 'chg')}>
+                    <span className="rp-name">
+                      <b>{c.name}</b>
+                      <small>{c.area || '—'}</small>
+                    </span>
+                    <input type="number" inputMode="decimal" value={rate} onChange={(e) => rpSet(c.id, 'rate', e.target.value)} />
+                    <input type="number" inputMode="decimal" value={pr} onChange={(e) => rpSet(c.id, 'profit', e.target.value)} placeholder="—" />
+                    <span className="muted">{Number(pr) > 0 ? inr(Math.max(0, Number(rate) - Number(pr))) : '—'}</span>
+                  </div>
+                )
+              })}
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="btn ghost" onClick={() => setRp(null)}>
+                Cancel
+              </button>
+              <button type="button" className="btn primary" onClick={rpSave} disabled={!Object.keys(rp.v).length}>
+                <Icon name="check" size={18} /> Save {Object.keys(rp.v).length || ''} change{Object.keys(rp.v).length === 1 ? '' : 's'}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       <Modal open={!!imp} onClose={() => setImp(null)} wide>
         {imp && (
@@ -304,6 +405,14 @@ export default function Customers() {
               </Field>
               <Field label="Max unpaid days" hint="oldest bill age">
                 <input type="number" inputMode="numeric" value={edit.maxDays} onChange={(e) => setEdit({ ...edit, maxDays: e.target.value })} />
+              </Field>
+            </div>
+            <div className="two">
+              <Field label="My profit per kg (₹)" hint="after manufacturing & all costs">
+                <input type="number" inputMode="decimal" value={edit.profitPerKg} onChange={(e) => setEdit({ ...edit, profitPerKg: e.target.value })} />
+              </Field>
+              <Field label="Map location" hint="Google Maps link, lat,lng or plus code">
+                <input value={edit.locText} onChange={(e) => setEdit({ ...edit, locText: e.target.value })} placeholder="13.0827, 80.2707" />
               </Field>
             </div>
             <label className="switch">

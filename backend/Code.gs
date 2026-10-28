@@ -12,10 +12,11 @@ const COMPANY = 'Agenic';
 const REMIND_HOUR = 9; // daily automatic check runs around this hour (script time zone)
 
 const SCHEMA = {
-  customers: { tab: 'Customers', cols: ['id', 'name', 'area', 'phone', 'email', 'rate', 'creditLimit', 'maxDays', 'active', 'address', 'mapUrl'], text: ['id', 'phone'] },
-  deliveries: { tab: 'Deliveries', cols: ['id', 'date', 'customerId', 'customerName', 'qty', 'rate', 'cost', 'amount', 'note'], text: ['id', 'date', 'customerId'] },
+  customers: { tab: 'Customers', cols: ['id', 'name', 'area', 'phone', 'email', 'rate', 'creditLimit', 'maxDays', 'active', 'address', 'mapUrl', 'profitPerKg', 'lat', 'lng', 'locSource'], text: ['id', 'phone'] },
+  deliveries: { tab: 'Deliveries', cols: ['id', 'date', 'customerId', 'customerName', 'qty', 'rate', 'cost', 'amount', 'note', 'driverId', 'seq'], text: ['id', 'date', 'customerId', 'driverId'] },
   costs: { tab: 'DayCosts', cols: ['id', 'date', 'driver', 'diesel', 'porter', 'other', 'porterBooked', 'note'], text: ['id', 'date'] },
   payments: { tab: 'Payments', cols: ['id', 'date', 'customerId', 'customerName', 'amount', 'mode', 'note'], text: ['id', 'date', 'customerId'] },
+  drivers: { tab: 'Drivers', cols: ['id', 'name', 'phone', 'vehicle', 'capacityKg', 'startAddress', 'startLat', 'startLng', 'stretch', 'active'], text: ['id', 'phone'] },
   settings: { tab: 'Settings', cols: ['key', 'value'], text: [] }
 };
 
@@ -116,7 +117,7 @@ function read_(name) {
 
 function getAll_() {
   const out = {};
-  ['customers', 'deliveries', 'costs', 'payments'].forEach(function (k) { out[k] = read_(k); });
+  ['customers', 'deliveries', 'costs', 'payments', 'drivers'].forEach(function (k) { out[k] = read_(k); });
   const settings = {};
   read_('settings').forEach(function (r) { settings[r.key] = r.value; });
   out.settings = settings;
@@ -212,11 +213,11 @@ function sendReminder_(customerId, subject, body) {
 /* ------------------------------------------- automatic daily reminder run */
 function duesFor_() {
   const customers = read_('customers').filter(function (c) { return c.active !== false && String(c.active).toUpperCase() !== 'FALSE'; });
-  const deliveries = read_('deliveries');
-  const payments = read_('payments');
   const settings = getAll_().settings;
   const defMax = Number(settings.maxUnpaidDays) || 3;
   const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  const deliveries = read_('deliveries').filter(function (d) { return String(d.date) <= today; }); // planned (future) orders are not owed yet
+  const payments = read_('payments');
   const dayMs = 86400000;
 
   return customers.map(function (c) {

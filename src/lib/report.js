@@ -165,7 +165,7 @@ export async function buildReport({ mode, anchor, data }) {
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
   doc.setTextColor(...COL.mute)
-  doc.text('Sales - batter cost - driver - diesel - porter - other', W - M - 5, y + 9, { align: 'right' })
+  doc.text('Profit from kg sold - driver - diesel - porter - other', W - M - 5, y + 9, { align: 'right' })
   doc.text(`Payment status as on ${fmtDate(todayStr(), { day: 'numeric', month: 'short', year: 'numeric' })}`, W - M - 5, y + 15, { align: 'right' })
   doc.setTextColor(...COL.ink)
   y += 26
@@ -176,8 +176,8 @@ export async function buildReport({ mode, anchor, data }) {
     { label: 'Total kg delivered', value: kg1(T.kg) },
     { label: mode === 'day' ? 'Orders' : `Orders (${T.days} days)`, value: String(T.orders) },
     { label: 'Sales', value: rs(T.revenue) },
-    { label: 'Batter cost', value: rs(T.batter) },
-    { label: 'Gross margin', value: rs(T.margin), color: T.margin >= 0 ? COL.pos : COL.neg },
+    { label: 'Product cost', value: rs(T.batter) },
+    { label: 'Profit before delivery', value: rs(T.margin), color: T.margin >= 0 ? COL.pos : COL.neg },
     { label: 'Delivery expense', value: rs(T.logistics), color: COL.warn },
     { label: 'Collected (cash in)', value: rs(T.collected), color: COL.pos },
     { label: 'Unpaid on these orders', value: rs(T.due), color: T.due > 0.5 ? COL.neg : COL.pos }
@@ -208,19 +208,19 @@ export async function buildReport({ mode, anchor, data }) {
     const r0 = rows[0]
     const body = (r0?.deliveries || []).map((d, i) => {
       const c = data.customers.find((x) => x.id === d.customerId)
-      return [i + 1, d.customerName, c?.area || '', kg1(d.qty), rs(d.rate), rs(d.qty * d.rate), PAY_LABEL[d.pay.status]]
+      return [i + 1, d.customerName, c?.area || '', kg1(d.qty), rs(d.rate), rs(d.qty * d.rate), rs(d.profit, true), PAY_LABEL[d.pay.status]]
     })
     table({
-      head: [['#', 'Customer', 'Area', 'Kg', 'Rate/kg', 'Amount', 'Payment']],
-      body: body.length ? body : [['', 'No orders recorded', '', '', '', '', '']],
-      foot: body.length ? [['', 'Total', '', kg1(T.kg), '', rs(T.revenue), '']] : undefined,
-      columnStyles: { 0: { cellWidth: 9 }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' } },
-      didParseCell: colorStatus(6, payColor)
+      head: [['#', 'Customer', 'Area', 'Kg', 'Rate/kg', 'Amount', 'Profit', 'Payment']],
+      body: body.length ? body : [['', 'No orders recorded', '', '', '', '', '', '']],
+      foot: body.length ? [['', 'Total', '', kg1(T.kg), '', rs(T.revenue), rs(T.margin, true), '']] : undefined,
+      columnStyles: { 0: { cellWidth: 9 }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' }, 6: { halign: 'right' } },
+      didParseCell: colorStatus(7, payColor)
     })
   } else {
     section('Day-wise orders, expenses and payment status', 60)
     table({
-      head: [['Date', 'Orders', 'Kg', 'Sales', 'Batter', 'Driver', 'Diesel', 'Porter', 'Other', 'Net', 'Paid', 'Pending', 'Payment']],
+      head: [['Date', 'Orders', 'Kg', 'Sales', 'Cost', 'Driver', 'Diesel', 'Porter', 'Other', 'Net', 'Paid', 'Pending', 'Payment']],
       body: rows.map((r) => [
         fmtDate(r.date, { weekday: 'short', day: 'numeric', month: 'short' }),
         r.count,
@@ -252,9 +252,10 @@ export async function buildReport({ mode, anchor, data }) {
     const byC = new Map()
     rows.forEach((r) =>
       r.deliveries.forEach((d) => {
-        const o = byC.get(d.customerId) || { name: d.customerName, orders: 0, kg: 0, billed: 0, due: 0 }
+        const o = byC.get(d.customerId) || { name: d.customerName, orders: 0, kg: 0, billed: 0, due: 0, profit: 0 }
         o.orders++
         o.kg += d.qty
+        o.profit += d.profit
         o.billed += d.qty * d.rate
         o.due += d.pay.due
         byC.set(d.customerId, o)
@@ -263,11 +264,11 @@ export async function buildReport({ mode, anchor, data }) {
     const cust = [...byC.values()].sort((a, b) => b.kg - a.kg)
     section('Customer-wise summary (by kg)', 50)
     table({
-      head: [['Customer', 'Orders', 'Kg', 'Billed', 'Unpaid']],
-      body: cust.map((c) => [c.name, c.orders, Math.round(c.kg * 10) / 10, rs(c.billed), c.due > 0.5 ? rs(c.due) : 'Paid']),
-      columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } },
+      head: [['Customer', 'Orders', 'Kg', 'Billed', 'Profit', 'Unpaid']],
+      body: cust.map((c) => [c.name, c.orders, Math.round(c.kg * 10) / 10, rs(c.billed), rs(c.profit, true), c.due > 0.5 ? rs(c.due) : 'Paid']),
+      columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' } },
       didParseCell: (hook) => {
-        if (hook.section === 'body' && hook.column.index === 4) {
+        if (hook.section === 'body' && hook.column.index === 5) {
           hook.cell.styles.textColor = String(hook.cell.raw) === 'Paid' ? COL.pos : COL.neg
           hook.cell.styles.fontStyle = 'bold'
         }
@@ -278,7 +279,7 @@ export async function buildReport({ mode, anchor, data }) {
   // ---- management note
   section('Notes for management')
   const notes = []
-  notes.push(`${kg1(T.kg)} delivered in ${T.orders} order${T.orders === 1 ? '' : 's'}. Sales ${rs(T.revenue)}, batter cost ${rs(T.batter)}, gross margin ${rs(T.margin)}${T.kg ? ` (${rs(T.margin / T.kg)} per kg)` : ''}.`)
+  notes.push(`${kg1(T.kg)} delivered in ${T.orders} order${T.orders === 1 ? '' : 's'}. Sales ${rs(T.revenue)}, product cost ${rs(T.batter)}, profit before delivery ${rs(T.margin)}${T.kg ? ` (${rs(T.margin / T.kg)} per kg)` : ''}.`)
   notes.push(`Delivery expense ${rs(T.logistics)}${T.kg ? ` = ${rs(T.logistics / T.kg)} per kg` : ''}: driver ${rs(T.driver)}, diesel ${rs(T.diesel)}, porter ${rs(T.porter)}, other ${rs(T.other)}.`)
   notes.push(profit ? `Result: PROFIT of ${rs(T.net)} after all delivery expenses.` : `Result: LOSS of ${rs(-T.net)} after delivery expenses.`)
   if (!profit && T.kg && T.margin > 0) {

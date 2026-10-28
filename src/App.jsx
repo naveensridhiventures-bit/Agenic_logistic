@@ -8,16 +8,20 @@ import Entry from './pages/Entry'
 import Payments from './pages/Payments'
 import Customers from './pages/Customers'
 import Orders from './pages/Orders'
+import Routes from './pages/Routes'
+import DriverModal from './components/DriverModal'
+import AssignMenu from './components/AssignMenu'
 import Settings from './pages/Settings'
 import { cx } from './lib/util'
 
 const TABS = [
-  { id: 'dash', label: 'Dashboard', icon: 'dash', page: Dashboard },
-  { id: 'entry', label: 'Daily Entry', icon: 'truck', page: Entry },
-  { id: 'pay', label: 'Payments', icon: 'wallet', page: Payments },
-  { id: 'cust', label: 'Customers', icon: 'users', page: Customers },
-  { id: 'rep', label: 'Orders', icon: 'chart', page: Orders },
-  { id: 'set', label: 'Settings', icon: 'gear', page: Settings }
+  { id: 'dash', label: 'Dashboard', icon: 'dash', page: Dashboard, short: 'Home' },
+  { id: 'entry', label: 'Daily Entry', icon: 'truck', page: Entry, short: 'Entry' },
+  { id: 'route', label: 'Routes', icon: 'route', page: Routes, short: 'Routes' },
+  { id: 'pay', label: 'Payments', icon: 'wallet', page: Payments, short: 'Pay' },
+  { id: 'cust', label: 'Customers', icon: 'users', page: Customers, short: 'Hotels' },
+  { id: 'rep', label: 'Orders', icon: 'chart', page: Orders, short: 'Orders' },
+  { id: 'set', label: 'Settings', icon: 'gear', page: Settings, short: 'Setup' }
 ]
 
 function Splash() {
@@ -154,13 +158,15 @@ function Shell() {
                 <Icon name={t.icon} size={21} />
                 {t.id === 'cust' && breaches.length > 0 && <em className="badge">{breaches.length}</em>}
               </span>
-              <small>{t.label.split(' ').pop()}</small>
+              <small>{t.short || t.label}</small>
             </button>
           ))}
         </nav>
       </div>
 
       <AlertPopup />
+      <DriverModal />
+      <AssignMenu />
       <Toasts />
     </>
   )

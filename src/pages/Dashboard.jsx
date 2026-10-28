@@ -9,9 +9,9 @@ import Chart from '../components/Chart'
 function verdictText(s) {
   if (s.kg === 0 && s.logistics > 0) return `No sales yet, but ${inr(s.logistics)} of delivery cost is booked.`
   if (s.net >= 0)
-    return `Batter margin ${inr(s.margin)} covers delivery cost ${inr(s.logistics)} and leaves ${inr(s.net)} in profit.`
-  if (s.margin <= 0) return `You are selling below batter cost today - check the rates.`
-  return `Delivery cost ${inr(s.logistics)} is more than batter margin ${inr(s.margin)}. About ${Math.ceil(
+    return `Your profit ${inr(s.margin)} covers delivery cost ${inr(s.logistics)} and leaves ${inr(s.net)} net.`
+  if (s.margin <= 0) return `No profit is set on today's orders - add profit per kg for your customers.`
+  return `Delivery cost ${inr(s.logistics)} is more than your profit ${inr(s.margin)}. About ${Math.ceil(
     s.shortKg || 0
   )} kg more would have broken even.`
 }
@@ -26,7 +26,7 @@ export default function Dashboard() {
 
   const flow = [
     { k: 'Sales', v: s.revenue, tone: 'pos', ic: 'box' },
-    { k: 'Batter cost', v: -s.batter, tone: 'neg', ic: 'box' },
+    { k: 'Product cost', v: -s.batter, tone: 'neg', ic: 'box' },
     { k: 'Driver salary', v: -s.driver, tone: 'neg', ic: 'truck' },
     { k: 'Diesel', v: -s.diesel, tone: 'neg', ic: 'fuel' },
     { k: 'Porter', v: -s.porter, tone: 'neg', ic: 'truck' },
@@ -85,7 +85,7 @@ export default function Dashboard() {
 
             <div className="hero-meter">
               <div className="row between tiny-row">
-                <span>Delivery cost vs batter margin</span>
+                <span>Delivery cost vs your profit</span>
                 <b>{s.margin > 0 ? `${Math.round(ratio * 100)}%` : '—'}</b>
               </div>
               <div className="track">
@@ -124,7 +124,7 @@ export default function Dashboard() {
       <motion.div variants={stagger} className="tiles">
         {[
           { l: 'Sales', v: s.revenue, ic: 'box', c: 'accent' },
-          { l: 'Batter cost', v: s.batter, ic: 'box', c: 'muted' },
+          { l: 'Product cost', v: s.batter, ic: 'box', c: 'muted' },
           { l: 'Delivery cost', v: s.logistics, ic: 'truck', c: 'warn' },
           { l: 'Collected today', v: s.collected, ic: 'wallet', c: 'pos' }
         ].map((t) => (
