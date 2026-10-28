@@ -15,6 +15,7 @@ const rs = (n, sign = false) => {
   const v = Math.round(Number(n) || 0)
   return `${v < 0 ? '-' : sign && v > 0 ? '+' : ''}Rs. ${Math.abs(v).toLocaleString('en-IN')}`
 }
+const rk = (n) => `Rs. ${(Number(n) || 0).toFixed(2)}`
 const kg1 = (n) => `${Math.round((Number(n) || 0) * 10) / 10} kg`
 const COL = {
   brand: [91, 61, 245],
@@ -186,19 +187,49 @@ export async function buildReport({ mode, anchor, data }) {
   // ---- delivery expenses
   section('Delivery expenses', 50)
   const pct = (v) => (T.revenue ? `${((v / T.revenue) * 100).toFixed(1)}%` : '-')
-  const perKg = (v) => (T.kg ? rs(v / T.kg) : '-')
+  const perKg = (v) => (T.kg ? rk(v / T.kg) : '-')
   table({
     head: [['Expense', 'Amount', 'Per kg', '% of sales']],
     body: [
       ['Driver salary', rs(T.driver), perKg(T.driver), pct(T.driver)],
       ['Diesel', rs(T.diesel), perKg(T.diesel), pct(T.diesel)],
-      ['Porter', rs(T.porter), perKg(T.porter), pct(T.porter)],
+      ['Porter / auto / bike', rs(T.porter), perKg(T.porter), pct(T.porter)],
       ['Other', rs(T.other), perKg(T.other), pct(T.other)]
     ],
     foot: [['Total delivery expense', rs(T.logistics), perKg(T.logistics), pct(T.logistics)]],
     columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' } },
     tableWidth: land ? 160 : 'auto'
   })
+  // ---- hired vehicles: which hotels went in which porter / auto / bike
+  const trips = rows.flatMap((r) => r.trips.map((t) => ({ ...t, day: r.date })))
+  const tripKg = sum(trips, (t) => t.kg)
+  const tripCost = sum(trips, (t) => t.cost)
+  if (trips.length || T.porter > 0) {
+    section('Porter / auto / bike trips', 50)
+    const multi = mode !== 'day'
+    const head = [[...(multi ? ['Date'] : []), 'Vehicle', 'Hotels delivered', 'Kg', 'Charge', 'Cost per kg']]
+    const body = trips.map((t) => [
+      ...(multi ? [fmtDate(t.day, { day: 'numeric', month: 'short' })] : []),
+      t.mode,
+      t.hotels.map((h) => `${h.name} (${kg1(h.kg)})`).join(', ') + (t.note ? `\n${t.note}` : ''),
+      kg1(t.kg),
+      rs(t.cost),
+      t.kg ? rk(t.perKg) : '-'
+    ])
+    const lump = sum(rows, (r) => r.legacyPorter)
+    if (lump > 0) body.push([...(multi ? [''] : []), 'Porter', 'Lump sum, not split by hotel', '', rs(lump), ''])
+    const k = multi ? 1 : 0
+    table({
+      head,
+      body,
+      foot: [[...(multi ? [''] : []), 'Total hired', '', kg1(tripKg), rs(tripCost + lump), tripKg ? rk(tripCost / tripKg) : '-']],
+      columnStyles: { [k + 2]: { halign: 'right' }, [k + 3]: { halign: 'right' }, [k + 4]: { halign: 'right' }, [k + 1]: { cellWidth: land ? 150 : 80 } }
+    })
+    paragraph([
+      `Hired vehicles: ${rs(tripCost)} for ${kg1(tripKg)}${tripKg ? ` = ${rk(tripCost / tripKg)} per kg` : ''} (${rs(tripCost)} / ${Math.round(tripKg * 10) / 10} kg).`,
+      T.kg ? `All delivery expense: ${rs(T.logistics)} / ${Math.round(T.kg * 10) / 10} kg = ${rk(T.logistics / T.kg)} per kg.` : ''
+    ].filter(Boolean))
+  }
   const notesList = rows.filter((r) => r.costNote).map((r) => `${fmtDate(r.date)}: ${r.costNote}`)
   if (notesList.length) paragraph(notesList.slice(0, 6).map((n) => `Expense note - ${n}`))
 
@@ -208,14 +239,16 @@ export async function buildReport({ mode, anchor, data }) {
     const r0 = rows[0]
     const body = (r0?.deliveries || []).map((d, i) => {
       const c = data.customers.find((x) => x.id === d.customerId)
-      return [i + 1, d.customerName, c?.area || '', kg1(d.qty), rs(d.rate), rs(d.qty * d.rate), rs(d.profit, true), PAY_LABEL[d.pay.status]]
+      const trip = r0.trips.find((t) => t.customerIds.split(',').includes(d.customerId))
+      const drv = data.drivers.find((x) => x.id === d.driverId)
+      return [i + 1, d.customerName, c?.area || '', kg1(d.qty), rs(d.rate), rs(d.qty * d.rate), rs(d.profit, true), trip ? trip.mode : drv ? drv.name : 'Own driver', PAY_LABEL[d.pay.status]]
     })
     table({
-      head: [['#', 'Customer', 'Area', 'Kg', 'Rate/kg', 'Amount', 'Profit', 'Payment']],
-      body: body.length ? body : [['', 'No orders recorded', '', '', '', '', '', '']],
-      foot: body.length ? [['', 'Total', '', kg1(T.kg), '', rs(T.revenue), rs(T.margin, true), '']] : undefined,
+      head: [['#', 'Customer', 'Area', 'Kg', 'Rate/kg', 'Amount', 'Profit', 'Delivered by', 'Payment']],
+      body: body.length ? body : [['', 'No orders recorded', '', '', '', '', '', '', '']],
+      foot: body.length ? [['', 'Total', '', kg1(T.kg), '', rs(T.revenue), rs(T.margin, true), '', '']] : undefined,
       columnStyles: { 0: { cellWidth: 9 }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' }, 6: { halign: 'right' } },
-      didParseCell: colorStatus(7, payColor)
+      didParseCell: colorStatus(8, payColor)
     })
   } else {
     section('Day-wise orders, expenses and payment status', 60)
@@ -280,7 +313,7 @@ export async function buildReport({ mode, anchor, data }) {
   section('Notes for management')
   const notes = []
   notes.push(`${kg1(T.kg)} delivered in ${T.orders} order${T.orders === 1 ? '' : 's'}. Sales ${rs(T.revenue)}, product cost ${rs(T.batter)}, profit before delivery ${rs(T.margin)}${T.kg ? ` (${rs(T.margin / T.kg)} per kg)` : ''}.`)
-  notes.push(`Delivery expense ${rs(T.logistics)}${T.kg ? ` = ${rs(T.logistics / T.kg)} per kg` : ''}: driver ${rs(T.driver)}, diesel ${rs(T.diesel)}, porter ${rs(T.porter)}, other ${rs(T.other)}.`)
+  notes.push(`Delivery expense ${rs(T.logistics)}${T.kg ? ` = ${rk(T.logistics / T.kg)} per kg` : ''}: driver ${rs(T.driver)}, diesel ${rs(T.diesel)}, porter/auto/bike ${rs(T.porter)}, other ${rs(T.other)}.`)
   notes.push(profit ? `Result: PROFIT of ${rs(T.net)} after all delivery expenses.` : `Result: LOSS of ${rs(-T.net)} after delivery expenses.`)
   if (!profit && T.kg && T.margin > 0) {
     const be = T.logistics / (T.margin / T.kg)

@@ -14,6 +14,7 @@ const emptyData = () => ({
   customers: [],
   deliveries: [],
   costs: [],
+  trips: [],
   payments: [],
   drivers: [],
   settings: { ...DEFAULT_SETTINGS },
@@ -79,6 +80,14 @@ function normalize(raw) {
       diesel: num(c.diesel),
       porter: num(c.porter),
       other: num(c.other)
+    })),
+    trips: (raw.trips || []).map((t) => ({
+      ...t,
+      id: String(t.id),
+      date: String(t.date),
+      mode: t.mode || 'Porter',
+      cost: num(t.cost),
+      customerIds: String(t.customerIds || '')
     })),
     payments: (raw.payments || []).map((p) => ({
       ...p,

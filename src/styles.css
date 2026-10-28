@@ -476,3 +476,12 @@ tfoot td { font-weight: 800; border-top: 2px solid var(--stroke); }
 .rp-name b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13.5px; }
 .rp-name small { color: var(--muted); font-size: 11.5px; }
 @media (max-width: 520px) { .rp-head, .rp-row { grid-template-columns: 1fr 70px 82px; } .rp-head span:last-child, .rp-row > span.muted { display: none; } }
+
+/* ---------- hired vehicle trips ---------- */
+.trips { display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 16px; background: rgba(255,255,255,.04); border: 1px solid var(--stroke); }
+.trip .li-main b { white-space: normal; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.pick { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 99px; font-size: 13px; background: rgba(255,255,255,.06); border: 1px solid var(--stroke); color: var(--text); cursor: pointer; transition: transform .15s, background .2s, border-color .2s; }
+.pick:hover { transform: translateY(-1px); }
+.pick.on { background: rgba(124,92,255,.28); border-color: rgba(124,92,255,.7); }
+.btn.sm { padding: 8px 12px; font-size: 13px; }

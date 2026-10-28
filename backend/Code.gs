@@ -15,6 +15,7 @@ const SCHEMA = {
   customers: { tab: 'Customers', cols: ['id', 'name', 'area', 'phone', 'email', 'rate', 'creditLimit', 'maxDays', 'active', 'address', 'mapUrl', 'profitPerKg', 'lat', 'lng', 'locSource'], text: ['id', 'phone'] },
   deliveries: { tab: 'Deliveries', cols: ['id', 'date', 'customerId', 'customerName', 'qty', 'rate', 'cost', 'amount', 'note', 'driverId', 'seq'], text: ['id', 'date', 'customerId', 'driverId'] },
   costs: { tab: 'DayCosts', cols: ['id', 'date', 'driver', 'diesel', 'porter', 'other', 'porterBooked', 'note'], text: ['id', 'date'] },
+  trips: { tab: 'Trips', cols: ['id', 'date', 'mode', 'cost', 'customerIds', 'note'], text: ['id', 'date', 'customerIds'] },
   payments: { tab: 'Payments', cols: ['id', 'date', 'customerId', 'customerName', 'amount', 'mode', 'note'], text: ['id', 'date', 'customerId'] },
   drivers: { tab: 'Drivers', cols: ['id', 'name', 'phone', 'vehicle', 'capacityKg', 'startAddress', 'startLat', 'startLng', 'stretch', 'active', 'baseRoute'], text: ['id', 'phone', 'baseRoute'] },
   settings: { tab: 'Settings', cols: ['key', 'value'], text: [] }
@@ -117,7 +118,7 @@ function read_(name) {
 
 function getAll_() {
   const out = {};
-  ['customers', 'deliveries', 'costs', 'payments', 'drivers'].forEach(function (k) { out[k] = read_(k); });
+  ['customers', 'deliveries', 'costs', 'payments', 'drivers', 'trips'].forEach(function (k) { out[k] = read_(k); });
   const settings = {};
   read_('settings').forEach(function (r) { settings[r.key] = r.value; });
   out.settings = settings;

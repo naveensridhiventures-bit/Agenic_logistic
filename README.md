@@ -67,3 +67,5 @@ The ₹40 selling rate already carries manufacturing and other costs, so you onl
 After updating `Code.gs`: run `setup` once (adds the Drivers tab and new columns), then Deploy → New version.
 
 **Regular route:** in Drivers → edit, paste the route list he drives now (kg is ignored). New orders are suggested by how far they take him off that route; hotels already on it go to him automatically, in his order.
+
+**Hired vehicles (porter / auto / bike):** in Daily Entry → Delivery cost, press *Add vehicle*, choose the vehicle, enter its charge and tap the hotels that went in it. The management PDF lists each trip with hotels, kg, charge and cost per kg, plus total delivery expense ÷ total kg. Run `setup` once to create the new `Trips` tab.

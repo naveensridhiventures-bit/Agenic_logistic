@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useApp } from '../store'
 import { costFor, dayStats, deliveryPayStatus, PAY_CHIP, PAY_LABEL, unitCostOf } from '../lib/calc'
 import { cx, inr, kgf, todayStr, uid } from '../lib/util'
+import Trips from '../components/Trips'
 import { DateNav, Empty, Field, Icon, Num, rise, stagger } from '../components/ui'
 
 const blank = { id: null, customerId: '', qty: '', rate: '', profit: '', paid: false, mode: 'Cash' }
@@ -82,13 +83,12 @@ export default function Entry() {
   const [c, setC] = useState(initCost)
   useEffect(() => setC(initCost()), [date, saved?.id]) // eslint-disable-line
   const n = (v) => Number(v) || 0
-  const logistics = n(c.driver) + n(c.diesel) + (c.porterBooked ? n(c.porter) : 0) + n(c.other)
+  const logistics = n(c.driver) + n(c.diesel) + n(saved?.porter) + s.hired + n(c.other)
   const liveNet = s.margin - logistics
   const dirty =
     !saved ||
     n(saved.driver) !== n(c.driver) ||
     n(saved.diesel) !== n(c.diesel) ||
-    n(saved.porter) !== (c.porterBooked ? n(c.porter) : 0) ||
     n(saved.other) !== n(c.other) ||
     (saved.note || '') !== c.note
 
@@ -98,19 +98,14 @@ export default function Entry() {
       date,
       driver: n(c.driver),
       diesel: n(c.diesel),
-      porter: c.porterBooked ? n(c.porter) : 0,
+      porter: n(saved?.porter),
       other: n(c.other),
-      porterBooked: c.porterBooked,
+      porterBooked: n(saved?.porter) > 0,
       note: c.note
     })
     toast(liveNet >= 0 ? `Saved - ${inr(liveNet)} profit for the day` : `Saved - ${inr(liveNet)} loss for the day`, liveNet >= 0 ? 'ok' : 'warn')
   }
 
-  const removePorter = () => {
-    setC((p) => ({ ...p, porter: '', porterBooked: false }))
-    if (saved) upsert('costs', { ...saved, porter: 0, porterBooked: false })
-    toast('Porter removed for this day')
-  }
   const deleteCosts = () => {
     if (!confirm('Delete the driver / diesel / porter costs for this day?')) return
     remove('costs', date)
@@ -312,29 +307,7 @@ export default function Entry() {
               </Field>
             </div>
 
-            <label className="switch">
-              <input type="checkbox" checked={c.porterBooked} onChange={(e) => setC({ ...c, porterBooked: e.target.checked })} />
-              <i />
-              <span>Porter booked today</span>
-            </label>
-            <AnimatePresence>
-              {c.porterBooked && (
-                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} style={{ overflow: 'hidden' }}>
-                  <div className="row gap" style={{ alignItems: 'flex-end' }}>
-                    <div className="grow">
-                      <Field label="Porter charge (₹)">
-                        <input type="number" inputMode="decimal" value={c.porter} onChange={(e) => setC({ ...c, porter: e.target.value })} placeholder="0" />
-                      </Field>
-                    </div>
-                    {saved && n(saved.porter) > 0 && (
-                      <button type="button" className="icon-btn danger" onClick={removePorter} aria-label="Remove porter" title="Remove porter">
-                        <Icon name="trash" size={16} />
-                      </button>
-                    )}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+            <Trips date={date} stats={s} />
 
             <div className="two">
               <Field label="Other expense (₹)">

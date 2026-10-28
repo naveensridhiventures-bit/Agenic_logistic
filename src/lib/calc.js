@@ -35,7 +35,22 @@ export function dayStats(date, data) {
   const c = costs.find((x) => x.date === date) || {}
   const driver = Number(c.driver) || 0
   const diesel = Number(c.diesel) || 0
-  const porter = Number(c.porter) || 0
+  const legacyPorter = Number(c.porter) || 0
+  const trips = (data.trips || [])
+    .filter((t) => t.date === date)
+    .map((t) => {
+      const ids = String(t.customerIds || '').split(',').filter(Boolean)
+      const hotels = ids.map((id) => ({
+        id,
+        name: data.customers.find((x) => x.id === id)?.name || ds.find((d) => d.customerId === id)?.customerName || id,
+        kg: sum(ds.filter((d) => d.customerId === id), (d) => d.qty)
+      }))
+      const tkg = sum(hotels, (h) => h.kg)
+      return { ...t, hotels, kg: tkg, perKg: tkg ? t.cost / tkg : 0 }
+    })
+  const hired = sum(trips, (t) => t.cost)
+  const hiredKg = sum(trips, (t) => t.kg)
+  const porter = legacyPorter + hired
   const other = Number(c.other) || 0
   const logistics = driver + diesel + porter + other
   const margin = revenue - batter
@@ -53,6 +68,10 @@ export function dayStats(date, data) {
     driver,
     diesel,
     porter,
+    legacyPorter,
+    trips,
+    hired,
+    hiredKg,
     other,
     logistics,
     net,
@@ -60,8 +79,8 @@ export function dayStats(date, data) {
     breakEvenKg,
     shortKg: breakEvenKg != null ? Math.max(0, breakEvenKg - kg) : null,
     collected: sum(payments.filter((p) => p.date === date), (p) => p.amount),
-    hasCosts: !!c.date,
-    empty: ds.length === 0 && !c.date
+    hasCosts: !!c.date || trips.length > 0,
+    empty: ds.length === 0 && !c.date && !trips.length
   }
 }
 
@@ -249,6 +268,8 @@ export function sumRows(rows) {
     driver: t('driver'),
     diesel: t('diesel'),
     porter: t('porter'),
+    hired: t('hired'),
+    hiredKg: t('hiredKg'),
     other: t('other'),
     logistics: t('logistics'),
     net: t('net'),
