@@ -1,12 +1,12 @@
 /* Driver app: phone first. Big tap targets, no hover effects, transform-only animation. */
-.drv, .d-login { --bg:#070b16; --card:#111a33; --card2:#16213f; --line:rgba(255,255,255,.09); --text:#f2f5ff; --mute:#93a0c4; --brand:#7c5cff; --go:#1fd68f; --amber:#ffb547; --bad:#ff5d73; --blue:#3d8bff;
+.dapp, .d-login { --bg:#070b16; --card:#111a33; --card2:#16213f; --line:rgba(255,255,255,.09); --text:#f2f5ff; --mute:#93a0c4; --brand:#7c5cff; --go:#1fd68f; --amber:#ffb547; --bad:#ff5d73; --blue:#3d8bff;
   color: var(--text); font-family: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
 html.driver-mode, html.driver-mode body, html.driver-mode #root { background: #070b16; }
 html.driver-mode body { margin: 0; overscroll-behavior-y: contain; -webkit-text-size-adjust: 100%; }
-.drv, .d-login { min-height: 100vh; min-height: 100dvh; box-sizing: border-box; }
-.drv *, .d-login * { box-sizing: border-box; }
-.drv button, .d-login button, .drv a, .d-login a { touch-action: manipulation; font-family: inherit; }
-.drv input, .drv textarea, .d-login input { font-size: 16px; font-family: inherit; } /* 16px stops iOS zooming on focus */
+.dapp, .d-login { min-height: 100vh; min-height: 100dvh; box-sizing: border-box; }
+.dapp *, .d-login * { box-sizing: border-box; }
+.dapp button, .d-login button, .dapp a, .d-login a { touch-action: manipulation; font-family: inherit; }
+.dapp input, .dapp textarea, .d-login input { font-size: 16px; font-family: inherit; } /* 16px stops iOS zooming on focus */
 
 /* ---------- login ---------- */
 .d-login { position: relative; display: flex; flex-direction: column; align-items: center; padding: calc(env(safe-area-inset-top) + 36px) 22px calc(env(safe-area-inset-bottom) + 24px); background: radial-gradient(120% 60% at 50% 0%, #1b1450 0%, #070b16 60%); overflow: hidden; }
@@ -31,7 +31,7 @@ html.driver-mode body { margin: 0; overscroll-behavior-y: contain; -webkit-text-
 .d-pad button.ghost { background: transparent; border-color: transparent; font-size: 16px; color: var(--mute); }
 
 /* ---------- main ---------- */
-.drv { background: var(--bg); padding: calc(env(safe-area-inset-top) + 12px) 16px calc(env(safe-area-inset-bottom) + 40px); max-width: 560px; margin: 0 auto; }
+.dapp { background: var(--bg); padding: calc(env(safe-area-inset-top) + 12px) 16px calc(env(safe-area-inset-bottom) + 40px); max-width: 560px; margin: 0 auto; }
 .d-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; padding: 6px 2px 14px; }
 .d-head small { color: var(--mute); font-size: 14px; }
 .d-head h1 { margin: 0; font-size: 26px; font-weight: 800; line-height: 1.15; }
@@ -143,4 +143,4 @@ html.driver-mode body { margin: 0; overscroll-behavior-y: contain; -webkit-text-
 .d-errtxt { color: #ff8da0; font-size: 13px; }
 .d-sheet-foot { flex: none; display: grid; gap: 10px; padding: 12px 18px calc(env(safe-area-inset-bottom) + 14px); border-top: 1px solid var(--line); background: #0f1830; }
 .d-toast { position: fixed; left: 16px; right: 16px; bottom: calc(env(safe-area-inset-bottom) + 20px); z-index: 80; max-width: 520px; margin: 0 auto; background: #202c52; border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; font-weight: 700; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,.5); }
-@media (prefers-reduced-motion: reduce) { .drv *, .d-login * { animation: none !important; transition: none !important; } }
+@media (prefers-reduced-motion: reduce) { .dapp *, .d-login * { animation: none !important; transition: none !important; } }

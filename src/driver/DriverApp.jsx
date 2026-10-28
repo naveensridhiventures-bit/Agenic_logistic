@@ -53,7 +53,7 @@ function Login({ onLogin }) {
     try {
       setDrivers(await dpost('driverList'))
     } catch (e) {
-      setErr(e.message)
+      setErr(/Wrong secret key|Unknown action/i.test(e.message) ? 'The office script is not updated yet. Ask the admin to paste the new Code.gs and deploy a New version.' : e.message)
       setDrivers([])
     }
   }
@@ -494,7 +494,7 @@ export default function DriverApp() {
   }
 
   return (
-    <div className="drv">
+    <div className="dapp">
       <header className="d-head">
         <div>
           <small>{greet()}</small>

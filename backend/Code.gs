@@ -9,6 +9,7 @@
  */
 const API_KEY = 'change-me-to-your-secret'; // <- must match the key you enter in the app
 const COMPANY = 'Agenic';
+const CODE_VERSION = 'driver-app-v1'; // open <web app url>?action=version to check which code is live
 const REMIND_HOUR = 9; // daily automatic check runs around this hour (script time zone)
 
 const SCHEMA = {
@@ -56,6 +57,7 @@ function json_(obj) {
 
 function doGet(e) {
   try {
+    if (e.parameter.action === 'version') return json_({ ok: true, version: CODE_VERSION });
     check_(e.parameter.key);
     if (e.parameter.action === 'getAll') return json_({ ok: true, data: getAll_() });
     return json_({ ok: true, message: COMPANY + ' ledger API is running' });
