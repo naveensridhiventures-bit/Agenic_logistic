@@ -93,7 +93,7 @@ section > .row.between { margin-bottom: 12px; }
 @keyframes ping { 70% { box-shadow: 0 0 0 10px rgba(255,93,115,0); } 100% { box-shadow: 0 0 0 0 rgba(255,93,115,0); } }
 
 /* bottom nav (mobile) */
-.bottom { position: fixed; left: 10px; right: 10px; bottom: calc(10px + env(safe-area-inset-bottom)); z-index: 20; display: grid; grid-template-columns: repeat(6, 1fr); padding: 6px; border-radius: 24px; background: rgba(13, 20, 40, 0.82); backdrop-filter: blur(22px) saturate(1.4); border: 1px solid var(--stroke); box-shadow: var(--shadow); }
+.bottom { position: fixed; left: 10px; right: 10px; bottom: calc(10px + env(safe-area-inset-bottom)); z-index: 20; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; padding: 6px; border-radius: 24px; background: rgba(13, 20, 40, 0.82); backdrop-filter: blur(22px) saturate(1.4); border: 1px solid var(--stroke); box-shadow: var(--shadow); }
 .b-item { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 0 5px; color: var(--muted); font-weight: 600; }
 .b-item small { font-size: 10px; }
 .b-item.on { color: var(--text); }
@@ -545,3 +545,54 @@ tfoot td { font-weight: 800; border-top: 2px solid var(--stroke); }
 .ledger-name { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .ledger-name small { color: var(--muted); }
 .ledger-row .neg { color: var(--neg); } .ledger-row .pos { color: var(--pos); }
+
+/* ---------- stock ---------- */
+.chip-btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: 99px; border: 1px solid var(--stroke); background: rgba(255,255,255,.05); color: var(--text); font-weight: 700; font-size: 14px; cursor: pointer; }
+.chip-btn.on { background: linear-gradient(120deg, rgba(124,92,255,.5), rgba(34,211,238,.3)); border-color: rgba(124,92,255,.8); }
+.check { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 14px; }
+.check input { width: 18px; height: 18px; flex: none; }
+.clear-first { border-color: rgba(255,176,32,.55); background: linear-gradient(120deg, rgba(255,176,32,.14), rgba(255,255,255,.03)); }
+.stock-batches { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-bottom: 10px; }
+.batch { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border-radius: 16px; background: rgba(255,255,255,.07); border: 1px solid var(--stroke); }
+.batch small, .batch em { color: var(--muted); font-style: normal; font-size: 12.5px; }
+.batch b { font-size: 24px; }
+.batch span { font-weight: 700; color: var(--brand2, #22d3ee); }
+.batch.old { border-color: var(--neg); } .batch.old em { color: var(--neg); }
+.stock-inputs { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.stock-prev { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+.stock-prev .stock-close { margin-left: auto; font-weight: 800; }
+.stock-prev.neg { border-color: var(--neg); }
+.suggest { border-color: rgba(34,211,238,.5); background: linear-gradient(120deg, rgba(34,211,238,.14), rgba(124,92,255,.12)); }
+.suggest-big { display: flex; align-items: baseline; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
+.suggest-big b { font-size: 40px; letter-spacing: -.02em; }
+.suggest-big span { font-size: 18px; font-weight: 700; color: var(--muted); }
+.stock .pos { color: var(--pos); } .stock .neg { color: var(--neg); }
+.tbl-wrap { overflow-x: auto; }
+.tbl { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 560px; }
+.tbl th { text-align: left; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; padding: 8px 10px; border-bottom: 1px solid var(--stroke); }
+.tbl td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,.06); white-space: nowrap; }
+.tbl small { color: var(--muted); }
+
+/* ---------- stock dashboard ---------- */
+.stk-login .pin-in { width: 84px; text-align: center; font-weight: 800; letter-spacing: .2em; border-radius: 12px; padding: 8px; }
+.stk-hint { flex-basis: 100%; margin: 0; color: var(--muted); font-size: 13px; position: relative; z-index: 1; }
+.stk-dash { display: flex; flex-direction: column; gap: 14px; }
+.stk-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.stk-tile { padding: 14px 16px; border-radius: 20px; border: 1px solid var(--stroke); background: rgba(255,255,255,.06); display: flex; flex-direction: column; gap: 2px; }
+.stk-tile small { color: var(--muted); font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+.stk-tile b { font-size: 24px; }
+.stk-tile.brand { background: linear-gradient(120deg, rgba(124,92,255,.4), rgba(34,211,238,.2)); border-color: rgba(124,92,255,.6); }
+.stk-tile.pos b { color: var(--pos); } .stk-tile.neg b { color: var(--neg); }
+.stk-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+.stk-card { display: flex; flex-direction: column; gap: 10px; padding: 16px; text-align: left; cursor: pointer; color: var(--text); }
+.stk-upd { font-size: 12px; color: var(--muted); padding: 4px 10px; border-radius: 99px; background: rgba(255,255,255,.07); }
+.stk-upd.on { color: var(--pos); background: rgba(31,214,143,.14); }
+.stk-hand { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.stk-hand b { font-size: 32px; letter-spacing: -.02em; } .stk-hand span { color: var(--muted); font-weight: 700; }
+.stk-mini { display: flex; gap: 6px 16px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+.stk-mini b { color: var(--text); } .stk-mini .pos { color: var(--pos); } .stk-mini .neg, .stk-card .neg { color: var(--neg); } .stk-card .pos { color: var(--pos); }
+.stk-bars { display: flex; gap: 6px; align-items: flex-end; height: 64px; }
+.stk-bar { flex: 1; height: 100%; display: flex; align-items: flex-end; justify-content: center; gap: 2px; position: relative; padding-bottom: 14px; }
+.stk-bar i { width: 38%; border-radius: 4px 4px 0 0; min-height: 2px; }
+.stk-bar i.m { background: #7c5cff; } .stk-bar i.s { background: #22d3ee; }
+.stk-bar small { position: absolute; bottom: 0; font-size: 10px; color: var(--muted); }

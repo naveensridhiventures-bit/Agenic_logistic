@@ -3,9 +3,11 @@ import { createRoot } from 'react-dom/client'
 import './styles.css'
 import './driver/driver.css'
 
-const isDriver = new URLSearchParams(location.search).has('driver') || location.hash === '#driver'
+const qs = new URLSearchParams(location.search)
+const isStock = qs.has('stock') || location.hash === '#stock'
+const isDriver = !isStock && (qs.has('driver') || location.hash === '#driver')
 
-if (isDriver) {
+if (isDriver || isStock) {
   // Make "Add to Home screen" install the driver app (it opens straight to driver login), not the admin app.
   const icons = [
     { src: `${location.origin}/icon-192.png`, sizes: '192x192', type: 'image/png' },
@@ -13,9 +15,9 @@ if (isDriver) {
     { src: `${location.origin}/icon-512.png`, sizes: '512x512', type: 'image/png', purpose: 'maskable' }
   ]
   const manifest = {
-    name: 'Agenic Driver',
-    short_name: 'Agenic Driver',
-    start_url: `${location.origin}/?driver=1`,
+    name: isStock ? 'Agenic Stock' : 'Agenic Driver',
+    short_name: isStock ? 'Agenic Stock' : 'Agenic Driver',
+    start_url: `${location.origin}/?${isStock ? 'stock' : 'driver'}=1`,
     scope: `${location.origin}/`,
     display: 'standalone',
     orientation: 'portrait',
@@ -32,11 +34,11 @@ if (isDriver) {
   }
   link.href = url
   document.documentElement.classList.add('driver-mode')
-  document.title = 'Agenic Driver'
+  document.title = isStock ? 'Agenic Stock' : 'Agenic Driver'
   document.querySelector('meta[name="viewport"]')?.setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover')
 }
 
-const App = React.lazy(() => (isDriver ? import('./driver/DriverApp') : import('./App')))
+const App = React.lazy(() => (isStock ? import('./stock/StockApp') : isDriver ? import('./driver/DriverApp') : import('./App')))
 
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>

@@ -6,6 +6,7 @@ import AlertPopup from './components/AlertPopup'
 import Dashboard from './pages/Dashboard'
 import Entry from './pages/Entry'
 import Payments from './pages/Payments'
+import Stock from './pages/Stock'
 import Customers from './pages/Customers'
 import Orders from './pages/Orders'
 import Routes from './pages/Routes'
@@ -18,6 +19,7 @@ const TABS = [
   { id: 'dash', label: 'Dashboard', icon: 'dash', page: Dashboard, short: 'Home' },
   { id: 'entry', label: 'Daily Entry', icon: 'truck', page: Entry, short: 'Entry' },
   { id: 'route', label: 'Routes', icon: 'route', page: Routes, short: 'Routes' },
+  { id: 'stock', label: 'Stock', icon: 'box', page: Stock, short: 'Stock' },
   { id: 'pay', label: 'Payments', icon: 'wallet', page: Payments, short: 'Pay' },
   { id: 'cust', label: 'Customers', icon: 'users', page: Customers, short: 'Hotels' },
   { id: 'rep', label: 'Orders', icon: 'chart', page: Orders, short: 'Orders' },

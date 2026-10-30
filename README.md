@@ -100,3 +100,14 @@ After updating `Code.gs`: paste it, run `setup` once (creates the Tracking tab a
 ## Customer ledgers (Tally style)
 - Customers page → **Customer ledgers**: customers listed highest pending first, tick any (or "Top 10 pending"), choose Day / Week / Month / Custom / All and download or share one PDF. Each customer gets an account ledger (opening balance b/f, sales as Debit, receipts as Credit, running balance, closing c/f); several customers also get a summary page.
 - The date-wise delivery report PDF no longer shows any payment figures (payments are recorded later in Payments and appear in the ledgers).
+
+## Stock (multi-product, date-wise, FIFO)
+- New **Stock** tab: products (e.g. Idli batter, Sridhi plain packets) each with packet size, safety %, shelf life. Per date enter Produced / Sent out / Wasted (kg or packets).
+- Oldest stock is used first; leftovers show next day as "Clear this old stock first" with kg, packets and age. Sheets tabs `Products` and `Stock` are created by `setup` (Code.gs version `stock-v1`).
+- "Make how much for tomorrow?" = expected need (Daily Entry orders for the batter product, else 7-day average dispatch) + safety %, minus stock in hand, rounded up to whole packets.
+- Date-wise table and stock report PDF (7/14/30 days, all products).
+
+## Stock in-charge login (`/?stock=1`)
+- Separate phone app for the stock in-charge: 4-digit PIN login (no admin key), Made / Sent out / Wasted in kg or packets, clear-first batches, tomorrow's suggestion, offline queue. Installs as "Agenic Stock".
+- Admin sets the PIN on the Stock tab (stored in Settings as `stockPin`), shares the link/QR/WhatsApp, and sees today's position, 7-day made-vs-sent bars, wastage %, and who updated when. Stock PDF now has KPI tiles + chart.
+- Code.gs version `stock-login-v1`: paste, run `setup`, deploy a New version.

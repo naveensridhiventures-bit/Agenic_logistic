@@ -16,6 +16,8 @@ const emptyData = () => ({
   costs: [],
   trips: [],
   tracking: [],
+  products: [],
+  stock: [],
   payments: [],
   drivers: [],
   settings: { ...DEFAULT_SETTINGS },
@@ -83,6 +85,17 @@ function normalize(raw) {
       porter: num(c.porter),
       other: num(c.other)
     })),
+    products: (raw.products || []).map((p) => ({
+      ...p,
+      id: String(p.id),
+      name: String(p.name || ''),
+      packetKg: num(p.packetKg),
+      buffer: p.buffer === '' || p.buffer == null ? 5 : num(p.buffer),
+      shelfDays: num(p.shelfDays),
+      main: p.main === true || String(p.main).toLowerCase() === 'true',
+      active: !(p.active === false || String(p.active).toLowerCase() === 'false')
+    })),
+    stock: (raw.stock || []).map((r) => ({ ...r, id: String(r.id), date: String(r.date), productId: String(r.productId), kg: num(r.kg) })),
     tracking: (raw.tracking || []).map((t) => ({ ...t, id: String(t.id), payAmount: num(t.payAmount) })),
     trips: (raw.trips || []).map((t) => ({
       ...t,

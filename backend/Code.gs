@@ -9,7 +9,7 @@
  */
 const API_KEY = 'change-me-to-your-secret'; // <- must match the key you enter in the app
 const COMPANY = 'Agenic';
-const CODE_VERSION = 'driver-app-v2'; // open <web app url>?action=version to check which code is live
+const CODE_VERSION = 'stock-login-v1'; // open <web app url>?action=version to check which code is live
 const REMIND_HOUR = 9; // daily automatic check runs around this hour (script time zone)
 
 const SCHEMA = {
@@ -20,6 +20,8 @@ const SCHEMA = {
   payments: { tab: 'Payments', cols: ['id', 'date', 'customerId', 'customerName', 'amount', 'mode', 'note'], text: ['id', 'date', 'customerId'] },
   drivers: { tab: 'Drivers', cols: ['id', 'name', 'phone', 'vehicle', 'capacityKg', 'startAddress', 'startLat', 'startLng', 'stretch', 'active', 'baseRoute', 'pin'], text: ['id', 'phone', 'baseRoute', 'pin'] },
   tracking: { tab: 'Tracking', cols: ['id', 'date', 'driverId', 'customerId', 'status', 'doneAt', 'remark', 'voiceId', 'payMode', 'payAmount', 'payAt', 'updatedAt', 'unlocked'], text: ['id', 'date', 'driverId', 'customerId', 'voiceId', 'doneAt', 'payAt', 'updatedAt', 'unlocked'] },
+  products: { tab: 'Products', cols: ['id', 'name', 'packetKg', 'buffer', 'shelfDays', 'main', 'active'], text: ['id'] },
+  stock: { tab: 'Stock', cols: ['id', 'date', 'productId', 'type', 'kg', 'note', 'by', 'updatedAt'], text: ['id', 'date', 'productId', 'type', 'updatedAt'] },
   settings: { tab: 'Settings', cols: ['key', 'value'], text: [] }
 };
 
@@ -72,6 +74,7 @@ function doPost(e) {
     lock.waitLock(20000);
     const req = JSON.parse(e.postData.contents);
     if (String(req.action || '').indexOf('driver') === 0) return json_({ ok: true, data: driverApi_(req) });
+    if (String(req.action || '').indexOf('stock') === 0) return json_({ ok: true, data: stockApi_(req) });
     check_(req.key);
     if (req.action === 'getVoice') return json_({ ok: true, data: getVoice_(req.fileId) });
     switch (req.action) {
@@ -92,6 +95,69 @@ function doPost(e) {
 
 function check_(key) {
   if (!key || key !== API_KEY) throw new Error('Wrong secret key');
+}
+
+/* ------------------------------------------------------------ stock in-charge app */
+// The stock in-charge logs in with a 4-digit PIN (Settings key stockPin, set by the admin on the Stock tab). No admin key is sent.
+function stockPin_() {
+  var v = '';
+  read_('settings').forEach(function (r) { if (r.key === 'stockPin') v = String(r.value == null ? '' : r.value); });
+  return v;
+}
+function stockToken_(pin) {
+  return Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature('stock|' + pin, API_KEY));
+}
+function stockAuth_(req) {
+  const pin = stockPin_();
+  if (!pin) throw new Error('Stock login is not set up. Ask the admin.');
+  if (!req.token || req.token !== stockToken_(pin)) throw new Error('Session expired. Please log in again.');
+}
+function stockApi_(req) {
+  if (req.action === 'stockLogin') return stockLogin_(req.pin);
+  stockAuth_(req);
+  if (req.action === 'stockData') return stockData_();
+  if (req.action === 'stockSave') return stockSave_(req.rows);
+  throw new Error('Unknown action: ' + req.action);
+}
+function stockLogin_(pin) {
+  const cache = CacheService.getScriptCache();
+  const fails = Number(cache.get('fail_stock') || 0);
+  if (fails >= 5) throw new Error('Too many wrong PINs. Try again in 10 minutes.');
+  const real = stockPin_();
+  if (!real || String(pin) !== real) {
+    cache.put('fail_stock', String(fails + 1), 600);
+    throw new Error('Wrong PIN');
+  }
+  cache.remove('fail_stock');
+  return { token: stockToken_(real), name: 'Stock in-charge' };
+}
+function stockData_() {
+  const t = today_();
+  const from = Utilities.formatDate(new Date(Date.now() - 60 * 864e5), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  const prods = read_('products').filter(function (p) { return String(p.active).toUpperCase() !== 'FALSE'; });
+  const stock = read_('stock').filter(function (s) { return String(s.date) >= from; });
+  const orders = read_('deliveries').filter(function (d) { return String(d.date) >= from; }).map(function (d) { return { date: d.date, qty: Number(d.qty) || 0 }; });
+  var company = COMPANY;
+  read_('settings').forEach(function (r) { if (r.key === 'company' && r.value) company = r.value; });
+  return { today: t, company: company, products: prods, stock: stock, deliveries: orders };
+}
+function stockSave_(rows) {
+  const t = today_();
+  const lo = Utilities.formatDate(new Date(Date.now() - 10 * 864e5), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  const hi = Utilities.formatDate(new Date(Date.now() + 2 * 864e5), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  const ids = {};
+  read_('products').forEach(function (p) { ids[String(p.id)] = 1; });
+  (rows || []).forEach(function (r) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(r.date)) || r.date < lo || r.date > hi) throw new Error('Date not allowed: ' + r.date);
+    if (!ids[String(r.productId)]) throw new Error('Unknown product');
+    if (['produce', 'dispatch', 'waste'].indexOf(r.type) < 0) throw new Error('Bad entry type');
+    const kg = Number(r.kg);
+    if (!(kg >= 0) || kg > 100000) throw new Error('Bad quantity');
+    const id = r.date + '|' + r.productId + '|' + r.type;
+    if (kg > 0) upsert_('stock', { id: id, date: r.date, productId: String(r.productId), type: r.type, kg: kg, note: String(r.note || '').slice(0, 200), by: 'Stock in-charge', updatedAt: nowIso_() });
+    else remove_('stock', id);
+  });
+  return stockData_();
 }
 
 /* ------------------------------------------------------------ driver app */
@@ -334,7 +400,7 @@ function read_(name) {
 
 function getAll_() {
   const out = {};
-  ['customers', 'deliveries', 'costs', 'payments', 'drivers', 'trips', 'tracking'].forEach(function (k) { out[k] = read_(k); });
+  ['customers', 'deliveries', 'costs', 'payments', 'drivers', 'trips', 'tracking', 'products', 'stock'].forEach(function (k) { out[k] = read_(k); });
   const settings = {};
   read_('settings').forEach(function (r) { settings[r.key] = r.value; });
   out.settings = settings;
@@ -396,6 +462,7 @@ function saveSettings_(obj) {
       for (var i = 0; i < keys.length; i++) if (keys[i][0] === k) { at = i + 2; break; }
     }
     if (at < 0) at = Math.max(last + 1, 2);
+    if (k === 'stockPin') s.sh.getRange(at, 2).setNumberFormat('@');
     s.sh.getRange(at, 1, 1, 2).setValues([[k, obj[k]]]);
   });
 }
