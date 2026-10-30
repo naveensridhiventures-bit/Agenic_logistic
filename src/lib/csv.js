@@ -70,7 +70,7 @@ function splitNamePrice(name) {
 }
 
 /** Best-effort locality from a Google-style address ("..., Sholinganallur, Chennai, Tamil Nadu 600119"). */
-function areaFromAddress(address) {
+export function areaFromAddress(address) {
   if (!address) return ''
   const parts = address
     .split(',')
@@ -80,7 +80,7 @@ function areaFromAddress(address) {
   return (good[good.length - 1] || '').replace(/^[A-Z0-9]{4}\+[A-Z0-9]{2,3}\s*/, '')
 }
 
-const titleCase = (s) => (s === s.toLowerCase() ? s.replace(/\b[a-z]/g, (c) => c.toUpperCase()) : s)
+export const titleCase = (s) => (s === s.toLowerCase() ? s.replace(/\b[a-z]/g, (c) => c.toUpperCase()) : s)
 
 /** rows: 2-D array, first row = headers. Works for CSV text, pasted cells and .xlsx sheets. */
 export function customersFromRows(rows, defaults = {}) {

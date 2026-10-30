@@ -120,3 +120,6 @@ After updating `Code.gs`: paste it, run `setup` once (creates the Tracking tab a
 - In-charge app: old-stock warning and 'Make today' suggestion now at the top; admin Stock tab shows today's suggestion too.
 - In-charge: tapping 'Sent out' (or Wasted) lists available stock by made-date, oldest first, and shows how much of each is used (e.g. finish 29 Oct 300 kg, then 200 kg from today's batch).
 - Stock reports: Today / This week / 7 days / Custom from-to, all products with summary page; in-charge can download or share; admin has a period picker.
+
+## Quick order (paste list)
+- Daily Entry → **Quick order**: paste the order list (name / phone / address / lat,lng / kg / ₹ per block, or simply "Hotel - 10kg"). Hotels are matched to Customers (by name, phone, location) or added as new. Tick hotels and assign them to an own driver (route is re-ordered to save diesel) or book a Porter / Auto / Bike with its cost (₹/kg shown per trip). **Quick porter / auto / bike order** does the same with one hired trip pre-created. Costs feed the day's delivery cost and the management reports.

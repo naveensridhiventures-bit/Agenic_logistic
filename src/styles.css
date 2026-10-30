@@ -541,7 +541,7 @@ tfoot td { font-weight: 800; border-top: 2px solid var(--stroke); }
 .ledger-list { max-height: 340px; overflow: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 4px; }
 .ledger-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 14px; border: 1px solid var(--stroke); background: rgba(255,255,255,.04); cursor: pointer; }
 .ledger-row.on { border-color: rgba(124,92,255,.8); background: rgba(124,92,255,.16); }
-.ledger-row input { width: 18px; height: 18px; flex: none; }
+.ledger-row input[type=checkbox] { width: 18px; height: 18px; flex: none; }
 .ledger-name { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .ledger-name small { color: var(--muted); }
 .ledger-row .neg { color: var(--neg); } .ledger-row .pos { color: var(--pos); }
@@ -598,3 +598,23 @@ tfoot td { font-weight: 800; border-top: 2px solid var(--stroke); }
 .stk-bar small { position: absolute; bottom: 0; font-size: 10px; color: var(--muted); }
 .chip-btn.dashed { border-style: dashed; color: var(--muted); }
 .rep-sel { padding: 8px 10px; border-radius: 12px; }
+
+/* ---------- quick order ---------- */
+.qo-text { width: 100%; border-radius: 16px; border: 1px solid var(--stroke); background: rgba(255,255,255,.05); color: var(--text); padding: 12px; font-size: 14px; font-family: inherit; resize: vertical; }
+.qo-sum { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; padding: 12px 14px; border-radius: 16px; background: rgba(255,255,255,.06); }
+.qo-bar { display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 16px; border: 1px dashed var(--stroke); }
+.qo-cost { width: 110px; }
+.qo-trips { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.qo-trip { padding: 12px; border-radius: 16px; border: 1px solid rgba(34,211,238,.5); background: rgba(34,211,238,.08); display: flex; flex-direction: column; gap: 8px; }
+.qo-trip input { width: 100px; }
+.qo-list { max-height: 360px; }
+.qo-row { flex-wrap: wrap; }
+.qo-n { width: 72px; padding: 6px 8px; border-radius: 10px; text-align: right; }
+.qo-asg { margin-left: auto; font-size: 12.5px; font-weight: 800; padding: 4px 10px; border-radius: 99px; background: rgba(255,255,255,.08); color: var(--muted); }
+.qo-asg.drv { background: rgba(124,92,255,.25); color: #cfc3ff; } .qo-asg.trip { background: rgba(34,211,238,.2); color: #9ff0ff; }
+.qo-row .qo-n { width: 76px; flex: none; padding: 6px 8px; }
+.qo-row .ledger-name { flex: 1 1 160px; }
+.qo-bar select { width: auto; min-width: 150px; flex: 1; }
+.qo-bar .qo-cost { width: 110px; flex: none; }
+.qo-trip input { width: 100px; flex: none; }
+.qo-trip select { width: auto; }

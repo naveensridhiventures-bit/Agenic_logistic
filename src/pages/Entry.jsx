@@ -4,6 +4,7 @@ import { useApp } from '../store'
 import { costFor, dayStats, deliveryPayStatus, PAY_CHIP, PAY_LABEL, unitCostOf } from '../lib/calc'
 import { cx, inr, kgf, todayStr, uid } from '../lib/util'
 import Trips from '../components/Trips'
+import QuickOrder from '../components/QuickOrder'
 import { DateNav, Empty, Field, Icon, Num, rise, stagger } from '../components/ui'
 
 const blank = { id: null, customerId: '', qty: '', rate: '', profit: '', paid: false, mode: 'Cash', by: 'driver', charge: '' }
@@ -18,6 +19,7 @@ export default function Entry() {
   const saved = data.costs.find((c) => c.date === date)
   const pay = useMemo(() => deliveryPayStatus(data), [data])
   const [busy, setBusy] = useState('')
+  const [quick, setQuick] = useState('')
 
   // ---------- delivery form ----------
   const [f, setF] = useState(blank)
@@ -164,6 +166,16 @@ export default function Entry() {
         </div>
         <DateNav future={3} />
       </motion.div>
+
+      <motion.div variants={rise} className="row gap wrap">
+        <button className="btn primary" onClick={() => setQuick('order')}>
+          <Icon name="plus" size={16} /> Quick order (paste list)
+        </button>
+        <button className="btn ghost" onClick={() => setQuick('porter')}>
+          <Icon name="truck" size={16} /> Quick porter / auto / bike order
+        </button>
+      </motion.div>
+      <QuickOrder key={quick} open={!!quick} preset={quick === 'porter' ? 'porter' : ''} onClose={() => setQuick('')} />
 
       {customers.length === 0 && (
         <motion.div variants={rise} className="preview solid">
