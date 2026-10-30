@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useApp } from '../store'
-import { ageOf, dayStock, packetText, packets, stockId, stockSummaryRange, suggestProduction } from '../lib/stock'
+import { ageOf, convText, dayStock, packetText, packets, stockId, stockSummaryRange, suggestProduction } from '../lib/stock'
 import { addDays, cx, fmtDate, todayStr, uid } from '../lib/util'
 import { StockDashboard, StockLoginCard } from '../components/StockDash'
 import { DateNav, Empty, Field, Icon, Modal, rise, stagger } from '../components/ui'
@@ -90,6 +90,8 @@ export default function Stock() {
     const name = edit.name.trim()
     if (!name) return toast('Enter the product name', 'warn')
     if (!edit.id) {
+      const dup = [...new Set(String(edit.sizes || '').split(/[,\s]+/).map(Number).filter((x) => x > 0))].map((sz) => packName(name, sz)).concat(String(edit.sizes || '').trim() ? [] : [name]).find((n) => data.products.some((x) => x.active !== false && x.name.toLowerCase() === n.toLowerCase()))
+      if (dup) return toast(`${dup} already exists`, 'warn')
       const sizes = [...new Set(String(edit.sizes || '').split(/[,\s]+/).map((x) => Number(x)).filter((x) => x > 0))]
       const list = sizes.length ? sizes : [0]
       const rows = list.map((sz, i) => ({ id: uid(), name: packName(name, sz), packetKg: sz, buffer: Number(edit.buffer) || 0, shelfDays: Number(edit.shelfDays) || 0, main: !!edit.main && i === 0, active: true }))
@@ -114,7 +116,9 @@ export default function Stock() {
     setEdit(null)
     toast(`${edit.name} hidden (its stock history is kept)`)
   }
+  const missing = PRESETS.filter((p) => !data.products.some((x) => x.active !== false && x.name.toLowerCase() === p.name.toLowerCase()))
   const addPreset = (p) => {
+    if (data.products.some((x) => x.active !== false && x.name.toLowerCase() === p.name.toLowerCase())) return toast(`${p.name} is already added`, 'warn')
     const row = { id: uid(), ...p, active: true }
     upsert('products', row)
     setPid(row.id)
@@ -181,8 +185,13 @@ export default function Stock() {
             {p.name}
           </button>
         ))}
+        {missing.map((p) => (
+          <button key={p.name} type="button" className="chip-btn dashed" onClick={() => addPreset(p)}>
+            <Icon name="plus" size={14} /> {p.name}
+          </button>
+        ))}
         <button type="button" className="chip-btn" onClick={() => setEdit({ ...blankP })}>
-          <Icon name="plus" size={14} /> Product
+          <Icon name="plus" size={14} /> Other product
         </button>
         <button type="button" className="chip-btn" onClick={() => setEdit({ id: product.id, name: product.name, packetKg: String(product.packetKg || ''), buffer: String(product.buffer ?? 5), shelfDays: String(product.shelfDays || ''), main: !!product.main })}>
           <Icon name="edit" size={14} /> Edit {product.name}
@@ -229,7 +238,7 @@ export default function Stock() {
         <div className="form">
           <div className="stock-inputs">
             {[['produce', 'Produced today', 'new batch made'], ['dispatch', 'Sent out / sold', 'went to delivery'], ['waste', 'Wasted / discarded', 'spoiled or returned']].map(([k, t, h]) => (
-              <Field key={k} label={`${t} (${unit === 'pk' ? 'packets' : 'kg'})`} hint={vals[k] > 0 && pk ? `${kgt(vals[k])} = ${packetText(vals[k], product)}` : h}>
+              <Field key={k} label={`${t} (${unit === 'pk' ? 'packets' : 'kg'})`} hint={convText(f[k], unit, product) || h}>
                 <input type="number" inputMode="decimal" min="0" step="any" value={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.value })} placeholder="0" />
               </Field>
             ))}

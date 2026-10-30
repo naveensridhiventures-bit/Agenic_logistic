@@ -116,3 +116,4 @@ After updating `Code.gs`: paste it, run `setup` once (creates the Tracking tab a
 - Each pack size is its own stock line (e.g. Idli batter 1 kg / 5 kg, Vada batter 1 kg / 5 kg, Sridhi plain packets). "Product" → type a name and sizes like `1, 5` to create one line per size. Entry defaults to packet counts; products can be hidden (history kept).
 - Stock login error now shows which Code.gs version the script is running.
 - Default Apps Script URL switched to the new deployment (AKfycby7wN4…).
+- Stock entry shows the packet maths (100 packets × 5 kg = 500 kg / 100 kg ÷ 5 kg = 20 packets); quick-add chips for missing products; duplicate products blocked.

@@ -220,3 +220,4 @@ button.d-return { width: 100%; background: transparent; font-family: inherit; }
 .sk-big { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; } .sk-big b { font-size: 38px; letter-spacing: -.02em; } .sk-big span { color: #7fb2ff; font-weight: 800; font-size: 17px; }
 .sk-day { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; width: 100%; text-align: left; padding: 12px 0; border: 0; border-top: 1px solid var(--line); background: none; color: var(--text); }
 .sk-day:first-of-type { border-top: 0; } .sk-day span { grid-column: 1; color: var(--mute); font-size: 13px; } .sk-day em { grid-row: 1 / 3; grid-column: 2; align-self: center; font-style: normal; font-weight: 800; }
+.sk-field em.conv { color: #7fb2ff; font-weight: 700; font-size: 14px; }

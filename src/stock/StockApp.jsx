@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { getCfg } from '../lib/api'
 import { dpost } from '../driver/dapi'
 import { addDays, cx, fmtDate, todayStr } from '../lib/util'
-import { ageOf, dayStock, packetText, stockId, stockSummaryRange, suggestProduction } from '../lib/stock'
+import { ageOf, convText, dayStock, packetText, stockId, stockSummaryRange, suggestProduction } from '../lib/stock'
 
 const SES = 'agenic.stock.session'
 const CACHE = 'agenic.stock.data'
@@ -347,7 +347,7 @@ function Home({ st }) {
           <label key={k} className="sk-field">
             <span>{t} <small>({unit === 'pk' ? 'packets' : 'kg'})</small></span>
             <input type="number" inputMode="decimal" min="0" step="any" value={f[k]} placeholder="0" onChange={(e) => setF({ ...f, [k]: e.target.value })} />
-            <em>{vals[k] > 0 && pk ? `${kgt(vals[k])} = ${packetText(vals[k], product)}` : h}</em>
+            <em className={convText(f[k], unit, product) ? 'conv' : ''}>{convText(f[k], unit, product) || h}</em>
           </label>
         ))}
         <label className="sk-field">

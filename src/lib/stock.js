@@ -15,6 +15,15 @@ export const packetText = (kg, product) => {
   return n == null ? '' : `${n} packet${n === 1 ? '' : 's'}`
 }
 
+const nz = (n) => String(Math.round((Number(n) || 0) * 100) / 100)
+/** Live hint under an input: "100 packets × 5 kg = 500 kg"  or  "100 kg ÷ 5 kg = 20 packets". */
+export function convText(raw, unit, product) {
+  const v = Number(raw) || 0
+  const pk = Number(product?.packetKg) || 0
+  if (!(v > 0) || !(pk > 0)) return ''
+  return unit === 'pk' ? `${nz(v)} packets × ${nz(pk)} kg = ${nz(v * pk)} kg` : `${nz(v)} kg ÷ ${nz(pk)} kg = ${nz(v / pk)} packets`
+}
+
 /** Replay every entry of one product day by day. Returns days[] ascending and a per-date lookup. */
 export function replay(productId, data, upTo) {
   const rows = (data.stock || []).filter((s) => s.productId === productId && s.date <= upTo)
