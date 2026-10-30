@@ -111,3 +111,6 @@ After updating `Code.gs`: paste it, run `setup` once (creates the Tracking tab a
 - Separate phone app for the stock in-charge: 4-digit PIN login (no admin key), Made / Sent out / Wasted in kg or packets, clear-first batches, tomorrow's suggestion, offline queue. Installs as "Agenic Stock".
 - Admin sets the PIN on the Stock tab (stored in Settings as `stockPin`), shares the link/QR/WhatsApp, and sees today's position, 7-day made-vs-sent bars, wastage %, and who updated when. Stock PDF now has KPI tiles + chart.
 - Code.gs version `stock-login-v1`: paste, run `setup`, deploy a New version.
+
+## Pack sizes & more products
+- Each pack size is its own stock line (e.g. Idli batter 1 kg / 5 kg, Vada batter 1 kg / 5 kg, Sridhi plain packets). "Product" → type a name and sizes like `1, 5` to create one line per size. Entry defaults to packet counts; products can be hidden (history kept).

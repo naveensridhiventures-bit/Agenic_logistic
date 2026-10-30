@@ -7,11 +7,15 @@ import { StockDashboard, StockLoginCard } from '../components/StockDash'
 import { DateNav, Empty, Field, Icon, Modal, rise, stagger } from '../components/ui'
 
 const PRESETS = [
-  { name: 'Idli batter', packetKg: 1, buffer: 5, shelfDays: 2, main: true },
+  { name: 'Idli batter · 5 kg packet', packetKg: 5, buffer: 5, shelfDays: 2, main: true },
+  { name: 'Idli batter · 1 kg packet', packetKg: 1, buffer: 5, shelfDays: 2, main: false },
+  { name: 'Vada batter · 1 kg packet', packetKg: 1, buffer: 5, shelfDays: 2, main: false },
+  { name: 'Vada batter · 5 kg packet', packetKg: 5, buffer: 5, shelfDays: 2, main: false },
   { name: 'Sridhi plain packets', packetKg: 0.5, buffer: 5, shelfDays: 2, main: false }
 ]
+const packName = (name, size) => (size > 0 ? `${name} · ${size} kg packet` : name)
 const kgt = (n) => `${Math.round((Number(n) || 0) * 100) / 100} kg`
-const blankP = { id: null, name: '', packetKg: '1', buffer: '5', shelfDays: '2', main: false }
+const blankP = { id: null, name: '', packetKg: '1', sizes: '1, 5', buffer: '5', shelfDays: '2', main: false }
 
 export default function Stock() {
   const { data, date, upsert, upsertMany, remove, toast, pull } = useApp()
@@ -33,8 +37,13 @@ export default function Stock() {
   useEffect(() => {
     if (!product) return
     const g = (t) => data.stock.find((s) => s.id === stockId(date, product.id, t))
-    setUnit('kg')
-    setF({ produce: g('produce')?.kg || '', dispatch: g('dispatch')?.kg || '', waste: g('waste')?.kg || '', note: g('produce')?.note || g('dispatch')?.note || '' })
+    const k = Number(product.packetKg) || 0
+    const show = (t) => {
+      const v = g(t)?.kg
+      return v ? (k ? Math.round((v / k) * 100) / 100 : v) : ''
+    }
+    setUnit(k ? 'pk' : 'kg')
+    setF({ produce: show('produce'), dispatch: show('dispatch'), waste: show('waste'), note: g('produce')?.note || g('dispatch')?.note || '' })
   }, [date, product?.id]) // eslint-disable-line
 
   const pk = Number(product?.packetKg) || 0
@@ -80,12 +89,30 @@ export default function Stock() {
   const saveProduct = () => {
     const name = edit.name.trim()
     if (!name) return toast('Enter the product name', 'warn')
+    if (!edit.id) {
+      const sizes = [...new Set(String(edit.sizes || '').split(/[,\s]+/).map((x) => Number(x)).filter((x) => x > 0))]
+      const list = sizes.length ? sizes : [0]
+      const rows = list.map((sz, i) => ({ id: uid(), name: packName(name, sz), packetKg: sz, buffer: Number(edit.buffer) || 0, shelfDays: Number(edit.shelfDays) || 0, main: !!edit.main && i === 0, active: true }))
+      if (rows.some((r) => r.main)) products.filter((x) => x.main).forEach((x) => upsert('products', { ...x, main: false }))
+      upsertMany('products', rows)
+      setPid(rows[0].id)
+      setEdit(null)
+      toast(rows.length > 1 ? `${rows.length} products added` : `${rows[0].name} added`)
+      return
+    }
     const row = { id: edit.id || uid(), name, packetKg: Number(edit.packetKg) || 0, buffer: Number(edit.buffer) || 0, shelfDays: Number(edit.shelfDays) || 0, main: !!edit.main, active: true }
     if (row.main) products.filter((p) => p.main && p.id !== row.id).forEach((p) => upsert('products', { ...p, main: false }))
     upsert('products', row)
     setPid(row.id)
     setEdit(null)
     toast(`${name} saved`)
+  }
+  const removeProduct = () => {
+    const p = data.products.find((x) => x.id === edit.id)
+    if (p) upsert('products', { ...p, active: false })
+    setPid('')
+    setEdit(null)
+    toast(`${edit.name} hidden (its stock history is kept)`)
   }
   const addPreset = (p) => {
     const row = { id: uid(), ...p, active: true }
@@ -117,7 +144,7 @@ export default function Stock() {
           <h2 className="h1">Stock</h2>
           <p className="muted">Date-wise production, dispatch and balance for every product.</p>
         </motion.div>
-        <Empty icon="box" title="Add your first product" text="Pick one to start (you can change name and packet size later), or add your own.">
+        <Empty icon="box" title="Add your first product" text="Tap the ones you sell (each pack size is tracked on its own), or add your own with several sizes at once.">
           <div className="row gap wrap" style={{ justifyContent: 'center' }}>
             {PRESETS.map((p) => (
               <button key={p.name} className="btn primary" onClick={() => addPreset(p)}>
@@ -129,7 +156,7 @@ export default function Stock() {
             </button>
           </div>
         </Empty>
-        <ProductModal edit={edit} setEdit={setEdit} onSave={saveProduct} />
+        <ProductModal edit={edit} setEdit={setEdit} onSave={saveProduct} onRemove={removeProduct} />
       </motion.div>
     )
 
@@ -306,12 +333,12 @@ export default function Stock() {
         )}
       </motion.section>
 
-      <ProductModal edit={edit} setEdit={setEdit} onSave={saveProduct} />
+      <ProductModal edit={edit} setEdit={setEdit} onSave={saveProduct} onRemove={removeProduct} />
     </motion.div>
   )
 }
 
-function ProductModal({ edit, setEdit, onSave }) {
+function ProductModal({ edit, setEdit, onSave, onRemove }) {
   return (
     <Modal open={!!edit} onClose={() => setEdit(null)}>
       {edit && (
@@ -321,9 +348,15 @@ function ProductModal({ edit, setEdit, onSave }) {
             <input value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} placeholder="e.g. Sridhi plain packets" />
           </Field>
           <div className="two">
-            <Field label="Packet size (kg)" hint="1 packet = how many kg. 0 = not sold in packets">
-              <input type="number" inputMode="decimal" min="0" step="any" value={edit.packetKg} onChange={(e) => setEdit({ ...edit, packetKg: e.target.value })} />
-            </Field>
+            {edit.id ? (
+              <Field label="Packet size (kg)" hint="1 packet = how many kg. 0 = not sold in packets">
+                <input type="number" inputMode="decimal" min="0" step="any" value={edit.packetKg} onChange={(e) => setEdit({ ...edit, packetKg: e.target.value })} />
+              </Field>
+            ) : (
+              <Field label="Packet sizes (kg)" hint="e.g. 1, 5 makes a separate stock line for each size. Leave empty for loose kg">
+                <input value={edit.sizes} onChange={(e) => setEdit({ ...edit, sizes: e.target.value })} placeholder="1, 5" />
+              </Field>
+            )}
             <Field label="Safety extra (%)" hint="Added on top when suggesting production">
               <input type="number" inputMode="decimal" min="0" value={edit.buffer} onChange={(e) => setEdit({ ...edit, buffer: e.target.value })} />
             </Field>
@@ -335,6 +368,9 @@ function ProductModal({ edit, setEdit, onSave }) {
             <input type="checkbox" checked={edit.main} onChange={(e) => setEdit({ ...edit, main: e.target.checked })} /> This is the batter sold to hotels (use Daily Entry orders for suggestions)
           </label>
           <div className="modal-actions">
+            {edit.id && (
+              <button className="btn ghost" type="button" onClick={onRemove}>Hide product</button>
+            )}
             <button className="btn ghost" type="button" onClick={() => setEdit(null)}>Cancel</button>
             <button className="btn primary" type="button" onClick={onSave}>Save product</button>
           </div>

@@ -225,8 +225,13 @@ function Home({ st }) {
   useEffect(() => {
     if (!product) return
     const g = (t) => data.stock.find((s) => s.id === stockId(date, product.id, t))
-    setUnit('kg')
-    setF({ produce: g('produce')?.kg || '', dispatch: g('dispatch')?.kg || '', waste: g('waste')?.kg || '', note: g('produce')?.note || g('dispatch')?.note || '' })
+    const k = Number(product.packetKg) || 0
+    const show = (t) => {
+      const v = g(t)?.kg
+      return v ? (k ? Math.round((v / k) * 100) / 100 : v) : ''
+    }
+    setUnit(k ? 'pk' : 'kg')
+    setF({ produce: show('produce'), dispatch: show('dispatch'), waste: show('waste'), note: g('produce')?.note || g('dispatch')?.note || '' })
   }, [date, product?.id]) // eslint-disable-line
 
   const pk = Number(product?.packetKg) || 0
