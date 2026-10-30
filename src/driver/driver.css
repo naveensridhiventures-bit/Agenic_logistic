@@ -214,6 +214,7 @@ button.d-return { width: 100%; background: transparent; font-family: inherit; }
 .sk-sum { margin-top: 14px; padding: 12px 14px; border-radius: 16px; background: rgba(255,255,255,.06); display: flex; flex-direction: column; gap: 2px; font-size: 14px; color: var(--mute); }
 .sk-sum b { color: var(--text); font-size: 18px; } .sk-sum.neg { outline: 1.5px solid var(--bad); }
 .sk-warn { color: var(--bad) !important; }
+.sk-ok { color: var(--go) !important; font-weight: 700; }
 .sk-save { margin-top: 14px; width: 100%; height: 62px; border-radius: 20px; border: 0; font-size: 19px; font-weight: 800; color: #fff; background: linear-gradient(120deg, #7c5cff, #3d8bff); box-shadow: 0 14px 30px -12px rgba(124,92,255,.9); }
 .sk-save:disabled { background: rgba(255,255,255,.1); box-shadow: none; color: var(--mute); }
 .sk-save:active:not(:disabled) { transform: scale(.98); }

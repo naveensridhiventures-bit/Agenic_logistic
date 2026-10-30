@@ -65,6 +65,7 @@ export default function Stock() {
   }, [data, date, product, f, unit]) // eslint-disable-line
   const sug = useMemo(() => (product ? suggestProduction(product, date, data) : null), [data, date, product])
   const nextDay = addDays(date, 1)
+  const sugToday = useMemo(() => (product ? suggestProduction(product, date, data) : null), [data, date, product])
   const sugNext = useMemo(() => {
     if (!product) return null
     const others = data.stock.filter((s) => !(s.date === date && s.productId === product.id))
@@ -269,6 +270,21 @@ export default function Stock() {
             <Icon name="check" size={18} /> Save stock
           </button>
         </div>
+      </motion.section>
+
+      <motion.section variants={rise} className="card pad suggest">
+        <h3 className="h3">
+          <Icon name="route" size={18} /> Make how much {date === todayStr() ? 'today' : `on ${fmtDate(date, { day: 'numeric', month: 'short' })}`}?
+        </h3>
+        <div className="suggest-big">
+          <b>{kgt(sugToday.make)}</b>
+          <span>{packetText(sugToday.make, product) || ' '}</span>
+        </div>
+        <p className="muted">
+          {sugToday.source === 'none'
+            ? 'Not enough history yet.'
+            : `Daily need ${kgt(sugToday.demand)} ${sugToday.source === 'orders' ? '(orders entered)' : `(avg of last ${sugToday.samples} day${sugToday.samples === 1 ? '' : 's'})`}${sugToday.buffer ? ` + ${sugToday.buffer}% safety` : ''}, minus ${kgt(sugToday.carry)} old stock in hand.`}
+        </p>
       </motion.section>
 
       <motion.section variants={rise} className="card pad suggest">

@@ -261,6 +261,7 @@ function Home({ st }) {
   const saved = useMemo(() => (product ? dayStock(product, date, data) : null), [data, date, product])
   const prev = useMemo(() => (product ? dayStock(product, date, { ...data, stock: data.stock.filter((s) => !(s.date === date && s.productId === product.id)) }) : null), [data, date, product])
   const live = useMemo(() => (product ? dayStock(product, date, withMine) : null), [withMine, date, product])
+  const sugDay = useMemo(() => (product ? suggestProduction(product, date, data) : null), [data, date, product])
   const sug = useMemo(() => (product ? suggestProduction(product, addDays(date, 1), withMine) : null), [withMine, date, product])
   const week = useMemo(() => (product ? stockSummaryRange(product, addDays(today, -6), today, data) : []), [data, product, today])
   const minD = addDays(today, -7)
@@ -301,18 +302,6 @@ function Home({ st }) {
         ))}
       </div>
 
-      <div className="sk-hero">
-        <small>In hand at end of {lbl.toLowerCase()}</small>
-        <b>{kgt(saved.closing)}</b>
-        <span>{packetText(saved.closing, product) || ' '}</span>
-      </div>
-      <div className="sk-tiles">
-        <div><small>Carried in</small><b>{kgt(prev.closing)}</b></div>
-        <div className="pos"><small>Made</small><b>{kgt(saved.produced)}</b></div>
-        <div><small>Sent out</small><b>{kgt(saved.dispatched)}</b></div>
-        <div className={saved.waste ? 'neg' : ''}><small>Wasted</small><b>{kgt(saved.waste)}</b></div>
-      </div>
-
       {prev.closingBatches.length > 0 && (
         <div className="sk-card warn">
           <h3>⚠ Clear this old stock first</h3>
@@ -332,6 +321,30 @@ function Home({ st }) {
           </div>
         </div>
       )}
+
+      <div className={cx('sk-card sug', sugDay.make === 0 && 'ok')}>
+        <h3>Make today · {kgt(sugDay.make)}{packetText(sugDay.make, product) ? ` (${packetText(sugDay.make, product)})` : ''}</h3>
+        <p>
+          {sugDay.source === 'none'
+            ? 'No sales history yet. Enter a few days of "Sent out" and I will suggest the daily quantity.'
+            : `Daily need about ${kgt(sugDay.demand)} ${sugDay.source === 'orders' ? '(today\'s orders)' : `(average of last ${sugDay.samples} day${sugDay.samples === 1 ? '' : 's'})`}${sugDay.buffer ? ` + ${sugDay.buffer}% safety = ${kgt(sugDay.target)}` : ''}${sugDay.carry ? `, minus ${kgt(sugDay.carry)} old stock already in hand` : ''}.`}
+        </p>
+        {sugDay.make === 0 && sugDay.source !== 'none' && <p className="sk-ok">Old stock is enough for today. Do not make a new batch.</p>}
+        {sugDay.expired > 0 && <p className="sk-warn">{kgt(sugDay.expired)} is past shelf life. Do not count on it.</p>}
+        {sugDay.source !== 'none' && vals.produce > sugDay.make + 0.001 && <p className="sk-warn">You entered {kgt(vals.produce)}, which is {kgt(vals.produce - sugDay.make)} more than needed. Extra may be wasted.</p>}
+      </div>
+
+      <div className="sk-hero">
+        <small>In hand at end of {lbl.toLowerCase()}</small>
+        <b>{kgt(saved.closing)}</b>
+        <span>{packetText(saved.closing, product) || ' '}</span>
+      </div>
+      <div className="sk-tiles">
+        <div><small>Carried in</small><b>{kgt(prev.closing)}</b></div>
+        <div className="pos"><small>Made</small><b>{kgt(saved.produced)}</b></div>
+        <div><small>Sent out</small><b>{kgt(saved.dispatched)}</b></div>
+        <div className={saved.waste ? 'neg' : ''}><small>Wasted</small><b>{kgt(saved.waste)}</b></div>
+      </div>
 
       <div className="sk-card">
         <div className="sk-row">

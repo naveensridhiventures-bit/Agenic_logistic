@@ -117,3 +117,4 @@ After updating `Code.gs`: paste it, run `setup` once (creates the Tracking tab a
 - Stock login error now shows which Code.gs version the script is running.
 - Default Apps Script URL switched to the new deployment (AKfycby7wN4…).
 - Stock entry shows the packet maths (100 packets × 5 kg = 500 kg / 100 kg ÷ 5 kg = 20 packets); quick-add chips for missing products; duplicate products blocked.
+- In-charge app: old-stock warning and 'Make today' suggestion now at the top; admin Stock tab shows today's suggestion too.
