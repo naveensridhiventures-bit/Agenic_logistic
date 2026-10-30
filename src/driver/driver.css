@@ -20,7 +20,7 @@ html.driver-mode body { margin: 0; overscroll-behavior-y: contain; -webkit-text-
 .d-av { width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; font-weight: 800; font-size: 20px; background: rgba(124,92,255,.3); color: #cfc3ff; flex: none; }
 .d-muted { color: var(--mute); text-align: center; margin: 8px 0; }
 .d-err { color: var(--bad); text-align: center; background: rgba(255,93,115,.12); border-radius: 14px; padding: 12px; }
-.d-err-slot { position: relative; min-height: 22px; color: var(--bad); font-size: 14px; margin: 4px 0 10px; text-align: center; }
+.d-err-slot { position: relative; min-height: 22px; max-width: 330px; color: var(--bad); font-size: 14px; margin: 4px 0 10px; text-align: center; }
 .d-link { background: none; border: 0; color: #b9a8ff; font-weight: 700; font-size: 15px; padding: 8px; }
 .d-dots { position: relative; display: flex; gap: 16px; margin: 6px 0; }
 .d-dots i { width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(255,255,255,.35); transition: background .15s, transform .15s; }

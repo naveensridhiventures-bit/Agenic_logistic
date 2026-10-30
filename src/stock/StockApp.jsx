@@ -151,7 +151,16 @@ function Login({ onLogin }) {
     try {
       await onLogin(next)
     } catch (e) {
-      setErr(/Wrong secret key|Unknown action/i.test(e.message) ? 'The office script is not updated yet. Ask the admin to deploy the new Code.gs.' : e.message)
+      if (/Wrong secret key|Unknown action/i.test(e.message)) {
+        let v = 'unknown'
+        try {
+          const r = await fetch(`${getCfg().url}?action=version`)
+          v = (await r.json()).version || 'unknown'
+        } catch {
+          v = 'could not reach the script'
+        }
+        setErr(`Office script is running "${v}" but needs "stock-login-v1". Script ...${getCfg().url.slice(-14, -5)}`)
+      } else setErr(e.message)
       setPin('')
       setShake((n) => n + 1)
       vib(80)
