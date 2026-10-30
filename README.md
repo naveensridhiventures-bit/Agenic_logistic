@@ -118,3 +118,4 @@ After updating `Code.gs`: paste it, run `setup` once (creates the Tracking tab a
 - Default Apps Script URL switched to the new deployment (AKfycby7wN4…).
 - Stock entry shows the packet maths (100 packets × 5 kg = 500 kg / 100 kg ÷ 5 kg = 20 packets); quick-add chips for missing products; duplicate products blocked.
 - In-charge app: old-stock warning and 'Make today' suggestion now at the top; admin Stock tab shows today's suggestion too.
+- In-charge: tapping 'Sent out' (or Wasted) lists available stock by made-date, oldest first, and shows how much of each is used (e.g. finish 29 Oct 300 kg, then 200 kg from today's batch).

@@ -218,6 +218,7 @@ function Home({ st }) {
   const product = products.find((p) => p.id === pid) || products[0]
   const [unit, setUnit] = useState('kg')
   const [f, setF] = useState({ produce: '', dispatch: '', waste: '', note: '' })
+  const [foc, setFoc] = useState('')
   const [toast, setToast] = useState('')
   const tt = useRef(null)
   const say = (m) => {
@@ -262,6 +263,7 @@ function Home({ st }) {
   const prev = useMemo(() => (product ? dayStock(product, date, { ...data, stock: data.stock.filter((s) => !(s.date === date && s.productId === product.id)) }) : null), [data, date, product])
   const live = useMemo(() => (product ? dayStock(product, date, withMine) : null), [withMine, date, product])
   const sugDay = useMemo(() => (product ? suggestProduction(product, date, data) : null), [data, date, product])
+  const avail = useMemo(() => (live ? [...live.carry, ...(live.produced > 0 ? [{ date, kg: live.produced }] : [])] : []), [live, date])
   const sug = useMemo(() => (product ? suggestProduction(product, addDays(date, 1), withMine) : null), [withMine, date, product])
   const week = useMemo(() => (product ? stockSummaryRange(product, addDays(today, -6), today, data) : []), [data, product, today])
   const minD = addDays(today, -7)
@@ -357,11 +359,38 @@ function Home({ st }) {
           )}
         </div>
         {[['produce', 'Made today', 'New batch produced'], ['dispatch', 'Sent out', 'Went for delivery / sold'], ['waste', 'Wasted', 'Spoiled or discarded']].map(([k, t, h]) => (
-          <label key={k} className="sk-field">
-            <span>{t} <small>({unit === 'pk' ? 'packets' : 'kg'})</small></span>
-            <input type="number" inputMode="decimal" min="0" step="any" value={f[k]} placeholder="0" onChange={(e) => setF({ ...f, [k]: e.target.value })} />
-            <em className={convText(f[k], unit, product) ? 'conv' : ''}>{convText(f[k], unit, product) || h}</em>
-          </label>
+          <div key={k}>
+            <label className="sk-field">
+              <span>{t} <small>({unit === 'pk' ? 'packets' : 'kg'})</small></span>
+              <input type="number" inputMode="decimal" min="0" step="any" value={f[k]} placeholder="0" onFocus={() => (k === 'dispatch' || k === 'waste') && setFoc(k)} onChange={(e) => setF({ ...f, [k]: e.target.value })} />
+              <em className={convText(f[k], unit, product) ? 'conv' : ''}>{convText(f[k], unit, product) || h}</em>
+            </label>
+            {(k === 'dispatch' || k === 'waste') && (foc === k || vals[k] > 0) && avail.length > 0 && (
+              <div className="sk-avail">
+                <b>{k === 'dispatch' ? 'Stock available to send — finish the oldest first' : 'Stock available — oldest first'}</b>
+                {avail.map((b, i) => {
+                  const take = (live.alloc.filter((a) => a.type === k && a.batchDate === b.date)[0]?.kg) || 0
+                  const age = ageOf(b.date, date)
+                  const left = Math.max(0, b.kg - take)
+                  return (
+                    <div key={b.date} className={cx('sk-av', i === 0 && 'first', take > 0 && 'use')}>
+                      <div>
+                        <strong>{b.date === date ? 'Made today' : `Made ${fmtDate(b.date, { weekday: 'short', day: 'numeric', month: 'short' })}`}</strong>
+                        <small>{age === 0 ? 'today' : `${age} day${age === 1 ? '' : 's'} old`}{i === 0 && b.date !== date ? ' · send first' : ''}</small>
+                      </div>
+                      <div className="sk-av-n">
+                        <b>{kgt(b.kg)}</b>
+                        <small>{packetText(b.kg, product)}</small>
+                      </div>
+                      {take > 0 && <p>→ {k === 'dispatch' ? 'sending' : 'taking'} <b>{kgt(take)}</b>{packetText(take, product) ? ` (${packetText(take, product)})` : ''} from this{left > 0.001 ? `, ${kgt(left)} still left` : ', finished ✓'}</p>}
+                    </div>
+                  )
+                })}
+                {vals[k] > 0 && avail.length > 1 && live.alloc.filter((a) => a.type === k && a.batchDate !== avail[0].date).length === 0 && null}
+                {k === 'dispatch' && vals.dispatch > 0 && avail[0].date !== date && vals.dispatch < avail[0].kg - 0.001 && <p className="sk-warn">The {fmtDate(avail[0].date, { day: 'numeric', month: 'short' })} stock is not finished yet ({kgt(avail[0].kg - vals.dispatch)} left). Send all of it first.</p>}
+              </div>
+            )}
+          </div>
         ))}
         <label className="sk-field">
           <span>Note <small>(optional)</small></span>
