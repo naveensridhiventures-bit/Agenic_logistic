@@ -55,7 +55,7 @@ export default function Orders() {
       r.deliveries.map((d) => [r.date, d.customerName, d.qty, d.rate, Math.round(d.pay.amount), Math.round(d.pay.paid), Math.round(d.pay.due), PAY_LABEL[d.pay.status]].map(q).join(','))
     )
     const costs = ['', '', '', '', '', '', '', ''].join(',')
-    const dayLines = [...rows].reverse().map((r) => [r.date, 'DAY TOTAL', r.kg, '', Math.round(r.revenue), Math.round(r.paid), Math.round(r.due), `Driver ${r.driver} | Diesel ${r.diesel} | Porter ${r.porter} | Other ${r.other} | Net ${Math.round(r.net)}`].map(q).join(','))
+    const dayLines = [...rows].reverse().map((r) => [r.date, 'DAY TOTAL', r.kg, '', Math.round(r.revenue), Math.round(r.paid), Math.round(r.due), `Driver ${r.driver} | Loadman ${r.loadman} | Helper ${r.helper} | Diesel ${r.diesel} | Porter ${r.porter} | Maintenance ${r.maintenance} | Other ${r.other} | Net ${Math.round(r.net)}`].map(q).join(','))
     const blob = new Blob([[head.join(','), ...lines, costs, ...dayLines].join('\n')], { type: 'text/csv' })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
@@ -201,7 +201,7 @@ export default function Orders() {
                       transition={{ duration: 0.28 }}
                     >
                       <div className="costchips">
-                        {[['Driver', r.driver], ['Diesel', r.diesel], ['Porter', r.porter], ['Other', r.other]].map(([k, v]) => (
+                        {[['Driver', r.driver], ['Loadman', r.loadman], ['Helper', r.helper], ['Diesel', r.diesel], ['Porter', r.porter], ['Maintenance', r.maintenance], ['Other', r.other]].map(([k, v]) => (
                           <span key={k}>
                             {k} <b>{inr(v)}</b>
                           </span>

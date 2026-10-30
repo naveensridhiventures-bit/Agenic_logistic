@@ -32,6 +32,8 @@ export default function Settings() {
       defaultProfitPerKg: Number(s.defaultProfitPerKg) || 0,
       defaultRate: Number(s.defaultRate) || 0,
       driverPerDay: Number(s.driverPerDay) || 0,
+      loadmanPerDay: Number(s.loadmanPerDay) || 0,
+      helperPerDay: Number(s.helperPerDay) || 0,
       mileageKmpl: Number(s.mileageKmpl) || 0,
       dieselPrice: Number(s.dieselPrice) || 0,
       ...pickup,
@@ -95,6 +97,14 @@ export default function Settings() {
           <Field label="Driver salary per day (₹)" hint="Pre-filled on each day's entry">
             <input type="number" inputMode="decimal" value={s.driverPerDay} onChange={(e) => set('driverPerDay', e.target.value)} />
           </Field>
+          <div className="two">
+            <Field label="Loadman salary per day (₹)" hint="Pre-filled on each day's entry">
+              <input type="number" inputMode="decimal" value={s.loadmanPerDay || ''} onChange={(e) => set('loadmanPerDay', e.target.value)} />
+            </Field>
+            <Field label="Helper pay per day (₹)" hint="Leave 0 if not every day">
+              <input type="number" inputMode="decimal" value={s.helperPerDay || ''} onChange={(e) => set('helperPerDay', e.target.value)} />
+            </Field>
+          </div>
           <h3 className="h3 mt"><Icon name="bell" size={18} /> Payment alerts</h3>
           <div className="two">
             <Field label="Default max unpaid days" hint="Alert when oldest bill is this old">

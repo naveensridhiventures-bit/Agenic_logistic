@@ -192,8 +192,11 @@ export async function buildReport({ mode, anchor, data }) {
     head: [['Expense', 'Amount', 'Per kg', '% of sales']],
     body: [
       ['Driver salary', rs(T.driver), perKg(T.driver), pct(T.driver)],
+      ['Loadman salary', rs(T.loadman), perKg(T.loadman), pct(T.loadman)],
+      ['Helper', rs(T.helper), perKg(T.helper), pct(T.helper)],
       ['Diesel', rs(T.diesel), perKg(T.diesel), pct(T.diesel)],
       ['Porter / auto / bike', rs(T.porter), perKg(T.porter), pct(T.porter)],
+      ['Vehicle maintenance', rs(T.maintenance), perKg(T.maintenance), pct(T.maintenance)],
       ['Other', rs(T.other), perKg(T.other), pct(T.other)]
     ],
     foot: [['Total delivery expense', rs(T.logistics), perKg(T.logistics), pct(T.logistics)]],
@@ -255,7 +258,7 @@ export async function buildReport({ mode, anchor, data }) {
   } else {
     section('Day-wise orders, expenses and payment status', 60)
     table({
-      head: [['Date', 'Orders', 'Kg', 'Sales', 'Cost', 'Driver', 'Diesel', 'Porter', 'Other', 'Net', 'Paid', 'Pending', 'Payment']],
+      head: [['Date', 'Orders', 'Kg', 'Sales', 'Cost', 'Driver', 'Crew*', 'Diesel', 'Porter', 'Other*', 'Net', 'Paid', 'Pending', 'Payment']],
       body: rows.map((r) => [
         fmtDate(r.date, { weekday: 'short', day: 'numeric', month: 'short' }),
         r.count,
@@ -263,20 +266,21 @@ export async function buildReport({ mode, anchor, data }) {
         rs(r.revenue),
         rs(r.batter),
         rs(r.driver),
+        rs(r.loadman + r.helper),
         rs(r.diesel),
         rs(r.porter),
-        rs(r.other),
+        rs(r.other + r.maintenance),
         rs(r.net, true),
         rs(r.paid),
         rs(r.due),
         PAY_LABEL[r.status]
       ]),
-      foot: [['Total', T.orders, Math.round(T.kg * 10) / 10, rs(T.revenue), rs(T.batter), rs(T.driver), rs(T.diesel), rs(T.porter), rs(T.other), rs(T.net, true), rs(T.paid), rs(T.due), '']],
+      foot: [['Total', T.orders, Math.round(T.kg * 10) / 10, rs(T.revenue), rs(T.batter), rs(T.driver), rs(T.loadman + T.helper), rs(T.diesel), rs(T.porter), rs(T.other + T.maintenance), rs(T.net, true), rs(T.paid), rs(T.due), '']],
       styles: { fontSize: 7.8, cellPadding: 1.6, lineColor: [225, 228, 238], lineWidth: 0.2, textColor: COL.ink },
-      columnStyles: Object.fromEntries([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((i) => [i, { halign: 'right' }])),
+      columnStyles: Object.fromEntries([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((i) => [i, { halign: 'right' }])),
       didParseCell: (hook) => {
-        colorStatus(12, payColor)(hook)
-        if (hook.section === 'body' && hook.column.index === 9) {
+        colorStatus(13, payColor)(hook)
+        if (hook.section === 'body' && hook.column.index === 10) {
           hook.cell.styles.textColor = String(hook.cell.raw).startsWith('-') ? COL.neg : COL.pos
           hook.cell.styles.fontStyle = 'bold'
         }
@@ -315,7 +319,7 @@ export async function buildReport({ mode, anchor, data }) {
   section('Notes for management')
   const notes = []
   notes.push(`${kg1(T.kg)} delivered in ${T.orders} order${T.orders === 1 ? '' : 's'}. Sales ${rs(T.revenue)}, product cost ${rs(T.batter)}, profit before delivery ${rs(T.margin)}${T.kg ? ` (${rs(T.margin / T.kg)} per kg)` : ''}.`)
-  notes.push(`Delivery expense ${rs(T.logistics)}${T.kg ? ` = ${rk(T.logistics / T.kg)} per kg` : ''}: driver ${rs(T.driver)}, diesel ${rs(T.diesel)}, porter/auto/bike ${rs(T.porter)}, other ${rs(T.other)}.`)
+  notes.push(`Delivery expense ${rs(T.logistics)}${T.kg ? ` = ${rk(T.logistics / T.kg)} per kg` : ''}: driver ${rs(T.driver)}, loadman ${rs(T.loadman)}, helper ${rs(T.helper)}, diesel ${rs(T.diesel)}, porter/auto/bike ${rs(T.porter)}, maintenance ${rs(T.maintenance)}, other ${rs(T.other)}.`)
   notes.push(profit ? `Result: PROFIT of ${rs(T.net)} after all delivery expenses.` : `Result: LOSS of ${rs(-T.net)} after delivery expenses.`)
   if (!profit && T.kg && T.margin > 0) {
     const be = T.logistics / (T.margin / T.kg)

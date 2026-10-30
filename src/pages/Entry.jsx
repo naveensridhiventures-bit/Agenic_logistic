@@ -104,6 +104,9 @@ export default function Entry() {
   const initCost = () => ({
     driver: saved ? saved.driver : settings.driverPerDay,
     diesel: saved ? saved.diesel : '',
+    loadman: saved ? saved.loadman : settings.loadmanPerDay || '',
+    helper: saved ? saved.helper : settings.helperPerDay || '',
+    maintenance: saved ? saved.maintenance : '',
     porter: saved ? saved.porter : '',
     other: saved ? saved.other : '',
     porterBooked: saved ? !!saved.porter || saved.porterBooked === true : false,
@@ -112,12 +115,15 @@ export default function Entry() {
   const [c, setC] = useState(initCost)
   useEffect(() => setC(initCost()), [date, saved?.id]) // eslint-disable-line
   const n = (v) => Number(v) || 0
-  const logistics = n(c.driver) + n(c.diesel) + n(saved?.porter) + s.hired + n(c.other)
+  const logistics = n(c.driver) + n(c.diesel) + n(saved?.porter) + s.hired + n(c.other) + n(c.loadman) + n(c.helper) + n(c.maintenance)
   const liveNet = s.margin - logistics
   const dirty =
     !saved ||
     n(saved.driver) !== n(c.driver) ||
     n(saved.diesel) !== n(c.diesel) ||
+    n(saved.loadman) !== n(c.loadman) ||
+    n(saved.helper) !== n(c.helper) ||
+    n(saved.maintenance) !== n(c.maintenance) ||
     n(saved.other) !== n(c.other) ||
     (saved.note || '') !== c.note
 
@@ -127,6 +133,9 @@ export default function Entry() {
       date,
       driver: n(c.driver),
       diesel: n(c.diesel),
+      loadman: n(c.loadman),
+      helper: n(c.helper),
+      maintenance: n(c.maintenance),
       porter: n(saved?.porter),
       other: n(c.other),
       porterBooked: n(saved?.porter) > 0,
@@ -373,16 +382,28 @@ export default function Entry() {
               </Field>
             </div>
 
+            <div className="two">
+              <Field label="Loadman salary (₹)" hint="loads and unloads the vehicle">
+                <input type="number" inputMode="decimal" value={c.loadman} onChange={(e) => setC({ ...c, loadman: e.target.value })} placeholder="0" />
+              </Field>
+              <Field label="Helper (₹)" hint="extra hand on the trip, e.g. 700">
+                <input type="number" inputMode="decimal" value={c.helper} onChange={(e) => setC({ ...c, helper: e.target.value })} placeholder="0" />
+              </Field>
+            </div>
+
             <Trips date={date} stats={s} />
 
             <div className="two">
+              <Field label="Vehicle maintenance (₹)" hint="repair, service, tyres, wash">
+                <input type="number" inputMode="decimal" value={c.maintenance} onChange={(e) => setC({ ...c, maintenance: e.target.value })} placeholder="0" />
+              </Field>
               <Field label="Other expense (₹)">
                 <input type="number" inputMode="decimal" value={c.other} onChange={(e) => setC({ ...c, other: e.target.value })} placeholder="0" />
               </Field>
-              <Field label="Note">
-                <input value={c.note} onChange={(e) => setC({ ...c, note: e.target.value })} placeholder="optional" />
-              </Field>
             </div>
+            <Field label="Note">
+              <input value={c.note} onChange={(e) => setC({ ...c, note: e.target.value })} placeholder="optional - e.g. helper Raju, tyre puncture" />
+            </Field>
 
             <div className="preview solid">
               <span>

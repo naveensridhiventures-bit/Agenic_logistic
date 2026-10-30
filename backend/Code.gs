@@ -9,13 +9,13 @@
  */
 const API_KEY = 'change-me-to-your-secret'; // <- must match the key you enter in the app
 const COMPANY = 'Agenic';
-const CODE_VERSION = 'stock-login-v1'; // open <web app url>?action=version to check which code is live
+const CODE_VERSION = 'crew-costs-v1'; // open <web app url>?action=version to check which code is live
 const REMIND_HOUR = 9; // daily automatic check runs around this hour (script time zone)
 
 const SCHEMA = {
   customers: { tab: 'Customers', cols: ['id', 'name', 'area', 'phone', 'email', 'rate', 'creditLimit', 'maxDays', 'active', 'address', 'mapUrl', 'profitPerKg', 'lat', 'lng', 'locSource'], text: ['id', 'phone'] },
   deliveries: { tab: 'Deliveries', cols: ['id', 'date', 'customerId', 'customerName', 'qty', 'rate', 'cost', 'amount', 'note', 'driverId', 'seq'], text: ['id', 'date', 'customerId', 'driverId'] },
-  costs: { tab: 'DayCosts', cols: ['id', 'date', 'driver', 'diesel', 'porter', 'other', 'porterBooked', 'note'], text: ['id', 'date'] },
+  costs: { tab: 'DayCosts', cols: ['id', 'date', 'driver', 'diesel', 'porter', 'other', 'porterBooked', 'note', 'loadman', 'helper', 'maintenance'], text: ['id', 'date'] },
   trips: { tab: 'Trips', cols: ['id', 'date', 'mode', 'cost', 'customerIds', 'note'], text: ['id', 'date', 'customerIds'] },
   payments: { tab: 'Payments', cols: ['id', 'date', 'customerId', 'customerName', 'amount', 'mode', 'note'], text: ['id', 'date', 'customerId'] },
   drivers: { tab: 'Drivers', cols: ['id', 'name', 'phone', 'vehicle', 'capacityKg', 'startAddress', 'startLat', 'startLng', 'stretch', 'active', 'baseRoute', 'pin'], text: ['id', 'phone', 'baseRoute', 'pin'] },

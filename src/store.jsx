@@ -83,7 +83,10 @@ function normalize(raw) {
       driver: num(c.driver),
       diesel: num(c.diesel),
       porter: num(c.porter),
-      other: num(c.other)
+      other: num(c.other),
+      loadman: num(c.loadman),
+      helper: num(c.helper),
+      maintenance: num(c.maintenance)
     })),
     products: (raw.products || []).map((p) => ({
       ...p,

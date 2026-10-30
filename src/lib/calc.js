@@ -12,6 +12,8 @@ export const DEFAULT_SETTINGS = {
   mileageKmpl: 12, // truck km per litre
   dieselPrice: 95, // rupees per litre
   driverPerDay: 0, // default driver salary pre-filled each day
+  loadmanPerDay: 0, // default loadman salary pre-filled each day
+  helperPerDay: 0, // default helper pay pre-filled each day
   ownerEmail: '',
   maxUnpaidDays: 3, // warn when a customer's oldest bill is this many days old
   warnPercent: 80 // "near limit" threshold (% of credit limit)
@@ -58,7 +60,10 @@ export function dayStats(date, data) {
   const hiredKg = sum(trips, (t) => t.kg)
   const porter = legacyPorter + hired
   const other = Number(c.other) || 0
-  const logistics = driver + diesel + porter + other
+  const loadman = Number(c.loadman) || 0
+  const helper = Number(c.helper) || 0
+  const maintenance = Number(c.maintenance) || 0
+  const logistics = driver + diesel + porter + other + loadman + helper + maintenance
   const margin = revenue - batter
   const net = margin - logistics
   const marginPerKg = kg ? margin / kg : 0
@@ -79,6 +84,9 @@ export function dayStats(date, data) {
     hired,
     hiredKg,
     other,
+    loadman,
+    helper,
+    maintenance,
     logistics,
     net,
     logisticsPerKg: kg ? logistics / kg : 0,
@@ -277,6 +285,9 @@ export function sumRows(rows) {
     hired: t('hired'),
     hiredKg: t('hiredKg'),
     other: t('other'),
+    loadman: t('loadman'),
+    helper: t('helper'),
+    maintenance: t('maintenance'),
     logistics: t('logistics'),
     net: t('net'),
     billed: t('billed'),

@@ -43,7 +43,7 @@ export default function BreakEven({ s }) {
       <div className="be-row">
         <span>Sold <b>{kgf(sold)}</b></span>
         <span>Profit <b>{inr(ppk)}/kg</b>{s.marginPerKg > 0 ? '' : ' (estimate)'}</span>
-        <span>Expenses <b>{inr(exp)}</b> <small>(driver {inr(s.driver)}, diesel {inr(s.diesel)}, hired {inr(s.porter)}, other {inr(s.other)})</small></span>
+        <span>Expenses <b>{inr(exp)}</b> <small>(driver {inr(s.driver)}, loadman {inr(s.loadman)}, helper {inr(s.helper)}, diesel {inr(s.diesel)}, hired {inr(s.porter)}, maintenance {inr(s.maintenance)}, other {inr(s.other)})</small></span>
       </div>
       <p className="be-msg">
         {ok
