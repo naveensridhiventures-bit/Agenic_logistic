@@ -123,3 +123,7 @@ After updating `Code.gs`: paste it, run `setup` once (creates the Tracking tab a
 
 ## Quick order (paste list)
 - Daily Entry → **Quick order**: paste the order list (name / phone / address / lat,lng / kg / ₹ per block, or simply "Hotel - 10kg"). Hotels are matched to Customers (by name, phone, location) or added as new. Tick hotels and assign them to an own driver (route is re-ordered to save diesel) or book a Porter / Auto / Bike with its cost (₹/kg shown per trip). **Quick porter / auto / bike order** does the same with one hired trip pre-created. Costs feed the day's delivery cost and the management reports.
+
+## Customer groups & break-even
+- Customers page: animated group cards (Cash & carry / Weekly payers / Occasional payers / Risk customers / New) from payment behaviour, each with 30-day kg, profit, pending and share of profit; tap to filter; group chip on every customer card.
+- Daily Entry: Break-even card - kg needed to cover the day's expenses, progress bar, and how much of the day's kg is pure profit.

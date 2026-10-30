@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useApp } from '../store'
 import { cx, fmtDate, inr, uid } from '../lib/util'
 import { parseLocation } from '../lib/geo'
 import { customersFromRows, customersFromText, mapUrl, rowsFromXlsx, TEMPLATE } from '../lib/csv'
 import LedgerPanel from '../components/LedgerPanel'
+import SegmentCards from '../components/SegmentCards'
+import { segmentsFor, SEGMENTS } from '../lib/segments'
 import { Empty, Field, Icon, Modal, Num, rise, Ring, stagger, StatusChip, Tilt } from '../components/ui'
 
 const blank = { id: null, name: '', area: '', address: '', profitPerKg: '', locText: '', origLoc: '', locSource: '', phone: '', email: '', rate: '', creditLimit: '', maxDays: '', active: true }
@@ -82,7 +84,10 @@ export default function Customers() {
     setImp(null)
   }
 
+  const seg = useMemo(() => segmentsFor(data, dues), [data, dues])
+  const [segF, setSegF] = useState('')
   const rows = dues.filter((d) => {
+    if (segF && seg.byId[d.customer.id] !== segF) return false
     if (q && !`${d.customer.name} ${d.customer.area}`.toLowerCase().includes(q.toLowerCase())) return false
     if (filter === 'breach') return d.status === 'breach'
     if (filter === 'due') return d.outstanding > 0
@@ -145,6 +150,7 @@ export default function Customers() {
         </div>
       </motion.div>
 
+      <SegmentCards seg={seg} active={segF} onPick={setSegF} />
       <LedgerPanel />
       <motion.div variants={rise} className="row gap wrap toolbar">
         <label className="search">
@@ -183,7 +189,10 @@ export default function Customers() {
                       <small className="muted">{c.area || '—'} · {inr(c.rate)}/kg</small>
                     </div>
                   </div>
-                  <StatusChip status={d.status} />
+                  <div className="chips-col">
+                    <StatusChip status={d.status} />
+                    <span className={cx('seg-chip', seg.byId[c.id])}>{SEGMENTS[seg.byId[c.id]]?.short}</span>
+                  </div>
                 </div>
 
                 <div className="cmid">

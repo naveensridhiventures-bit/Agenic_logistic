@@ -5,6 +5,7 @@ import { costFor, dayStats, deliveryPayStatus, PAY_CHIP, PAY_LABEL, unitCostOf }
 import { cx, inr, kgf, todayStr, uid } from '../lib/util'
 import Trips from '../components/Trips'
 import QuickOrder from '../components/QuickOrder'
+import BreakEven from '../components/BreakEven'
 import { DateNav, Empty, Field, Icon, Num, rise, stagger } from '../components/ui'
 
 const blank = { id: null, customerId: '', qty: '', rate: '', profit: '', paid: false, mode: 'Cash', by: 'driver', charge: '' }
@@ -194,6 +195,8 @@ export default function Entry() {
           </button>
         </motion.div>
       )}
+
+      <BreakEven s={s} />
 
       {/* live result strip */}
       <motion.div variants={rise} className={cx('live', liveNet >= 0 ? 'pos' : 'neg')} layout>
