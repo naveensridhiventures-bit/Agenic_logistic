@@ -28,8 +28,11 @@ export default function Dashboard() {
     { k: 'Sales', v: s.revenue, tone: 'pos', ic: 'box' },
     { k: 'Product cost', v: -s.batter, tone: 'neg', ic: 'box' },
     { k: 'Driver salary', v: -s.driver, tone: 'neg', ic: 'truck' },
+    { k: 'Loadman salary', v: -s.loadman, tone: 'neg', ic: 'truck' },
+    { k: 'Helper', v: -s.helper, tone: 'neg', ic: 'truck' },
     { k: 'Diesel', v: -s.diesel, tone: 'neg', ic: 'fuel' },
     { k: 'Porter', v: -s.porter, tone: 'neg', ic: 'truck' },
+    { k: 'Maintenance', v: -s.maintenance, tone: 'neg', ic: 'wallet' },
     { k: 'Other', v: -s.other, tone: 'neg', ic: 'wallet' }
   ]
   const maxFlow = Math.max(1, s.revenue, s.batter + s.logistics)
