@@ -55,6 +55,8 @@ function normalize(raw) {
       lat: ll(c.lat),
       lng: ll(c.lng),
       locSource: c.locSource || '',
+      remark: c.remark || '',
+      stoppedOn: c.stoppedOn ? String(c.stoppedOn).slice(0, 10) : '',
       active: c.active === false || String(c.active).toUpperCase() === 'FALSE' ? false : true
     })),
     deliveries: (raw.deliveries || []).map((d) => ({

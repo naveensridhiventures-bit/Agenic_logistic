@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useApp } from '../store'
 import { costFor, dayStats, deliveryPayStatus, PAY_CHIP, PAY_LABEL, unitCostOf } from '../lib/calc'
-import { cx, inr, kgf, todayStr, uid } from '../lib/util'
+import { buyingStats } from '../lib/buying'
+import { addDays, cx, inr, kgf, todayStr, uid } from '../lib/util'
 import Trips from '../components/Trips'
 import QuickOrder from '../components/QuickOrder'
 import BreakEven from '../components/BreakEven'
@@ -16,6 +17,12 @@ export default function Entry() {
   const { settings } = data
   const s = useMemo(() => dayStats(date, data), [data, date])
   const customers = data.customers.filter((c) => c.active !== false)
+  const buys = useMemo(() => {
+    const m = {}
+    const asOf = addDays(date, -1)
+    data.customers.forEach((c) => c.active !== false && (m[c.id] = buyingStats(c.id, data, asOf)))
+    return m
+  }, [data, date])
   const todays = data.deliveries.filter((d) => d.date === date)
   const saved = data.costs.find((c) => c.date === date)
   const pay = useMemo(() => deliveryPayStatus(data), [data])
@@ -35,7 +42,8 @@ export default function Entry() {
   const pickCustomer = (id) => {
     const c = data.customers.find((x) => x.id === id)
     const r = c ? c.rate || settings.defaultRate : ''
-    setF((p) => ({ ...p, customerId: id, rate: r, profit: c ? r2(Math.max(0, r - costFor(c, settings, r))) || '' : '' }))
+    const u = buys[id]?.usual
+    setF((p) => ({ ...p, customerId: id, qty: !p.id && !p.qty && u ? String(u) : p.qty, rate: r, profit: c ? r2(Math.max(0, r - costFor(c, settings, r))) || '' : '' }))
   }
   const onRate = (v) =>
     setF((p) => {
@@ -235,11 +243,28 @@ export default function Entry() {
                 <option value="">Select customer…</option>
                 {customers.map((x) => (
                   <option key={x.id} value={x.id}>
-                    {x.name} - {inr(x.rate)}/kg
+                    {x.name} - {inr(x.rate)}/kg{buys[x.id] ? ` · usual ${buys[x.id].usual} kg` : ''}
                   </option>
                 ))}
               </select>
             </Field>
+            {cust && (
+              <div className={cx('buyline', buys[cust.id]?.kind || 'none')}>
+                {buys[cust.id] ? (
+                  <>
+                    <b>{buys[cust.id].kind}</b>
+                    <span>{buys[cust.id].text}</span>
+                    {Number(f.qty) !== buys[cust.id].usual && (
+                      <button type="button" className="btn ghost sm" onClick={() => setF((p) => ({ ...p, qty: String(buys[cust.id].usual) }))}>
+                        Use {buys[cust.id].usual} kg
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <span>No orders in the last 60 days - enter the quantity.</span>
+                )}
+              </div>
+            )}
             <div className="three">
               <Field label="Quantity (kg)">
                 <input type="number" inputMode="decimal" min="0" step="0.5" value={f.qty} onChange={(e) => setF({ ...f, qty: e.target.value })} placeholder="0" />

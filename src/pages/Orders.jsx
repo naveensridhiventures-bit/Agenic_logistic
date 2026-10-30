@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useApp } from '../store'
 import { deliveryPayStatus, PAY_CHIP, PAY_LABEL, periodLabel, periodRange, periodRows, shiftPeriod, sumRows } from '../lib/calc'
 import { cx, fmtDate, inr, kgf, sum, todayStr } from '../lib/util'
+import CashReport from '../components/CashReport'
 import { Empty, Icon, Num, rise, stagger, StatusChip, Tilt } from '../components/ui'
 
 const MODES = [
@@ -18,6 +19,7 @@ export default function Orders() {
   const [filter, setFilter] = useState('all')
   const [open, setOpen] = useState(null)
   const [busy, setBusy] = useState('')
+  const [cashOpen, setCashOpen] = useState(false)
 
   const pay = useMemo(() => deliveryPayStatus(data), [data])
   const { start, end } = periodRange(mode, anchor)
@@ -78,6 +80,7 @@ export default function Orders() {
 
   return (
     <motion.div className="stack" variants={stagger} initial="hidden" animate="show">
+      <AnimatePresence>{cashOpen && <CashReport defFrom={start} defTo={end > todayStr() ? todayStr() : end} onClose={() => setCashOpen(false)} />}</AnimatePresence>
       <motion.div variants={rise} className="row between wrap">
         <div>
           <h2 className="h1">Orders &amp; reports</h2>
@@ -89,6 +92,9 @@ export default function Orders() {
           </button>
           <button className="btn ghost" onClick={() => makePdf(true)} disabled={!!busy || !rows.length}>
             <Icon name="mail" size={16} /> {busy === 'share' ? 'Preparing…' : 'Share'}
+          </button>
+          <button className="btn ghost" onClick={() => setCashOpen(true)}>
+            <Icon name="wallet" size={16} /> Cash received
           </button>
           <button className="btn ghost" onClick={csv} disabled={!rows.length}>
             CSV

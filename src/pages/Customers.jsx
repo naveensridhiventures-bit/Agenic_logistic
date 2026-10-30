@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useApp } from '../store'
-import { cx, fmtDate, inr, uid } from '../lib/util'
+import { cx, fmtDate, inr, todayStr, uid } from '../lib/util'
+import { buyingStats } from '../lib/buying'
 import { parseLocation } from '../lib/geo'
 import { customersFromRows, customersFromText, mapUrl, rowsFromXlsx, TEMPLATE } from '../lib/csv'
 import LedgerPanel from '../components/LedgerPanel'
@@ -9,12 +10,13 @@ import SegmentCards from '../components/SegmentCards'
 import { segmentsFor, SEGMENTS } from '../lib/segments'
 import { Empty, Field, Icon, Modal, Num, rise, Ring, stagger, StatusChip, Tilt } from '../components/ui'
 
-const blank = { id: null, name: '', area: '', address: '', profitPerKg: '', locText: '', origLoc: '', locSource: '', phone: '', email: '', rate: '', creditLimit: '', maxDays: '', active: true }
+const blank = { id: null, name: '', area: '', address: '', profitPerKg: '', locText: '', origLoc: '', locSource: '', phone: '', email: '', rate: '', creditLimit: '', maxDays: '', active: true, remark: '', stoppedOn: '' }
 
 export default function Customers() {
   const { data, dues, upsert, upsertMany, sendReminder, toast } = useApp()
   const [q, setQ] = useState('')
   const [filter, setFilter] = useState('all')
+  const [view, setView] = useState('active') // active | inactive
   const [edit, setEdit] = useState(null)
   const [busy, setBusy] = useState({})
   const [imp, setImp] = useState(null) // { text } while the import dialog is open
@@ -87,6 +89,7 @@ export default function Customers() {
   const seg = useMemo(() => segmentsFor(data, dues), [data, dues])
   const [segF, setSegF] = useState('')
   const rows = dues.filter((d) => {
+    if (d.inactive) return false
     if (segF && seg.byId[d.customer.id] !== segF) return false
     if (q && !`${d.customer.name} ${d.customer.area}`.toLowerCase().includes(q.toLowerCase())) return false
     if (filter === 'breach') return d.status === 'breach'
@@ -95,6 +98,19 @@ export default function Customers() {
     return true
   })
   const inactive = data.customers.filter((c) => c.active === false)
+  const inactiveRows = inactive
+    .filter((c) => !q || `${c.name} ${c.area}`.toLowerCase().includes(q.toLowerCase()))
+    .map((c) => ({ c, owes: dues.find((d) => d.customer.id === c.id)?.outstanding || 0 }))
+    .sort((a, b) => (b.c.stoppedOn || '').localeCompare(a.c.stoppedOn || ''))
+  const buy = useMemo(() => {
+    const m = {}
+    data.customers.forEach((c) => (m[c.id] = buyingStats(c.id, data)))
+    return m
+  }, [data])
+  const reactivate = (c) => {
+    upsert('customers', { ...c, active: true, stoppedOn: '' })
+    toast(`${c.name} is active again`)
+  }
 
   const remind = async (d) => {
     setBusy((b) => ({ ...b, [d.customer.id]: true }))
@@ -122,7 +138,9 @@ export default function Customers() {
       rate: Number(edit.rate),
       creditLimit: Number(edit.creditLimit) || 0,
       maxDays: Number(edit.maxDays) || 0,
-      active: edit.active
+      active: edit.active,
+      remark: (edit.remark || '').trim(),
+      stoppedOn: edit.active ? '' : edit.stoppedOn || todayStr()
     })
     toast(edit.id ? 'Customer updated' : 'Customer added')
     setEdit(null)
@@ -152,7 +170,38 @@ export default function Customers() {
 
       <SegmentCards seg={seg} active={segF} onPick={setSegF} />
       <LedgerPanel />
-      <motion.div variants={rise} className="row gap wrap toolbar">
+      <motion.div variants={rise} className="seg viewseg">
+        <button className={cx(view === 'active' && 'on')} onClick={() => setView('active')}>
+          {view === 'active' && <motion.i layoutId="viewseg" className="seg-pill" />}
+          <span>Active ({data.customers.length - inactive.length})</span>
+        </button>
+        <button className={cx(view === 'inactive' && 'on')} onClick={() => setView('inactive')}>
+          {view === 'inactive' && <motion.i layoutId="viewseg" className="seg-pill" />}
+          <span>Stopped ({inactive.length})</span>
+        </button>
+      </motion.div>
+      {view === 'inactive' && (
+        <div className="stack">
+          {inactiveRows.map(({ c, owes }) => (
+            <div key={c.id} className="card pad stopped">
+              <div className="row between wrap">
+                <div>
+                  <b>{c.name}</b> <small className="muted">{c.area}</small>
+                  <p className="muted tiny">Stopped {c.stoppedOn ? fmtDate(c.stoppedOn, { day: 'numeric', month: 'short', year: 'numeric' }) : '(date not recorded)'}</p>
+                </div>
+                <div className="row gap">
+                  {owes > 0.5 && <span className="chip breach">Still owes {inr(owes)}</span>}
+                  <button className="btn ghost sm" onClick={() => open(c)}>Remark</button>
+                  <button className="btn primary sm" onClick={() => reactivate(c)}>Make active</button>
+                </div>
+              </div>
+              <p className="remark">{c.remark ? `"${c.remark}"` : 'No remark added - tap Remark to note why they stopped.'}</p>
+            </div>
+          ))}
+          {!inactiveRows.length && <Empty icon="users" title="No stopped customers" text="When a hotel stops buying, open it and switch off Active customer - it disappears from Daily Entry." />}
+        </div>
+      )}
+      {view === 'active' && <motion.div variants={rise} className="row gap wrap toolbar">
         <label className="search">
           <Icon name="search" size={18} />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search hotel or area" />
@@ -170,9 +219,9 @@ export default function Customers() {
             </button>
           ))}
         </div>
-      </motion.div>
+      </motion.div>}
 
-      <motion.div className="cards" variants={stagger}>
+      {view === 'active' && <motion.div className="cards" variants={stagger}>
         <AnimatePresence mode="popLayout">
           {rows.map((d) => {
             const c = d.customer
@@ -215,6 +264,14 @@ export default function Customers() {
                   )}
                 </div>
 
+                {buy[c.id] ? (
+                  <div className={cx('buyline', buy[c.id].kind)}>
+                    <b>{buy[c.id].kind}</b>
+                    <span>{buy[c.id].text}</span>
+                  </div>
+                ) : (
+                  <div className="buyline none"><span>No orders in the last 60 days</span></div>
+                )}
                 <div className="limits">
                   <span>Limit {d.limit ? inr(d.limit) : '—'}</span>
                   <span>Max {d.maxDays || '—'} days</span>
@@ -249,14 +306,17 @@ export default function Customers() {
                   <button className="icon-btn" onClick={() => open(c)} aria-label="Edit customer">
                     <Icon name="edit" size={16} />
                   </button>
+                  <button className="btn ghost sm" onClick={() => open({ ...c, active: false })} title="Stop this customer">
+                    Stop
+                  </button>
                 </div>
                 {reminded && <small className="muted tiny">Last reminder {new Date(reminded).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</small>}
               </Tilt>
             )
           })}
         </AnimatePresence>
-      </motion.div>
-      {data.customers.length === 0 ? (
+      </motion.div>}
+      {view === 'active' && (data.customers.length === 0 ? (
         <Empty icon="users" title="No customers yet" text="Import all your hotels at once from a CSV or Excel sheet, or add them one by one.">
           <button className="btn primary" onClick={() => setImp({ text: '' })}>
             <Icon name="download" size={18} /> Bulk import customers
@@ -264,8 +324,7 @@ export default function Customers() {
         </Empty>
       ) : (
         rows.length === 0 && <Empty icon="users" title="No customers match" text="Try another search or filter." />
-      )}
-      {inactive.length > 0 && <p className="muted tiny">{inactive.length} inactive customer(s) hidden.</p>}
+      ))}
 
       <Modal open={!!rp} onClose={() => setRp(null)} wide>
         {rp && (
@@ -431,6 +490,10 @@ export default function Customers() {
               <i />
               <span>Active customer</span>
             </label>
+            {!edit.active && <p className="muted tiny">Stopped customers are hidden from Daily Entry. Any unpaid balance still shows for collection.</p>}
+            <Field label="Remark" hint={edit.active ? 'optional note about this customer' : 'why did they stop? e.g. closed, shifted to another supplier'}>
+              <textarea rows="2" value={edit.remark || ''} onChange={(e) => setEdit({ ...edit, remark: e.target.value })} placeholder="e.g. hotel closed for renovation till Dec" />
+            </Field>
             <div className="modal-actions">
               <button type="button" className="btn ghost" onClick={() => setEdit(null)}>Cancel</button>
               <button type="submit" className="btn primary">

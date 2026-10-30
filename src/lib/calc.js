@@ -116,7 +116,6 @@ export function computeDues(data, asOf = todayStr()) {
   const { customers, payments, settings } = data
   const deliveries = data.deliveries.filter((d) => d.date <= asOf)
   const rows = customers
-    .filter((c) => c.active !== false)
     .map((c) => {
       const ds = deliveries
         .filter((d) => d.customerId === c.id)
@@ -162,9 +161,12 @@ export function computeDues(data, asOf = todayStr()) {
         maxDays,
         usage,
         status,
-        reasons
+        reasons,
+        inactive: c.active === false
       }
     })
+    // a stopped customer drops off the list unless they still owe money
+    .filter((r) => !r.inactive || r.outstanding > 0.5)
   const rank = { breach: 0, warn: 1, ok: 2, clear: 3 }
   return rows.sort(
     (a, b) => rank[a.status] - rank[b.status] || b.outstanding - a.outstanding
