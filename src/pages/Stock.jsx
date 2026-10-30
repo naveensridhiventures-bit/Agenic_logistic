@@ -31,6 +31,15 @@ export default function Stock() {
   const [edit, setEdit] = useState(null)
   const [span, setSpan] = useState(14)
   const [busy, setBusy] = useState('')
+  const [rep, setRep] = useState({ mode: 'span', from: addDays(todayStr(), -6), to: todayStr() })
+  const repRange = () => {
+    const t = todayStr()
+    const dow = (new Date(t + 'T00:00:00').getDay() + 6) % 7
+    if (rep.mode === 'today') return { from: t, to: t, label: 'TODAY' }
+    if (rep.mode === 'week') return { from: addDays(t, -dow), to: t, label: 'THIS WEEK' }
+    if (rep.mode === 'custom') return { from: rep.from, to: rep.to, label: 'CUSTOM PERIOD' }
+    return { from: addDays(t, -(span - 1)), to: t, label: `LAST ${span} DAYS` }
+  }
 
   const rowsOf = (t) => data.stock.find((s) => s.id === stockId(date, product?.id, t))
   // load that day's saved numbers (always shown in kg) when date / product changes
@@ -128,7 +137,9 @@ export default function Stock() {
     setBusy(share ? 'share' : 'pdf')
     try {
       const [{ buildStockPdf }, { sharePdf }] = await Promise.all([import('../lib/stockPdf'), import('../lib/report')])
-      const { doc, filename } = await buildStockPdf({ products, from: addDays(todayStr(), -(span - 1)), to: todayStr(), data })
+      const r0 = repRange()
+      if (r0.from > r0.to) throw new Error('From date must be before To date')
+      const { doc, filename } = await buildStockPdf({ products, from: r0.from, to: r0.to, data, title: `STOCK REPORT - ${r0.label}`, by: 'Admin' })
       if (share) {
         const r = await sharePdf(doc, filename, 'Agenic stock report')
         if (r === 'downloaded') toast('Sharing not supported here - PDF downloaded instead')
@@ -316,6 +327,18 @@ export default function Stock() {
                 </button>
               ))}
             </div>
+            <select className="rep-sel" value={rep.mode} onChange={(e) => setRep({ ...rep, mode: e.target.value })} aria-label="Report period">
+              <option value="span">Report: last {span} days</option>
+              <option value="today">Report: today</option>
+              <option value="week">Report: this week</option>
+              <option value="custom">Report: custom dates</option>
+            </select>
+            {rep.mode === 'custom' && (
+              <>
+                <input type="date" value={rep.from} max={todayStr()} onChange={(e) => setRep({ ...rep, from: e.target.value })} />
+                <input type="date" value={rep.to} max={todayStr()} onChange={(e) => setRep({ ...rep, to: e.target.value })} />
+              </>
+            )}
             <button className="btn ghost sm" disabled={!!busy} onClick={() => pdf(false)}>
               <Icon name="download" size={15} /> {busy === 'pdf' ? '…' : 'PDF'}
             </button>

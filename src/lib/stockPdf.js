@@ -5,7 +5,7 @@ const COL = { brand: [91, 61, 245], ink: [17, 24, 39], mute: [107, 114, 128], po
 const kg = (n) => `${Math.round((Number(n) || 0) * 100) / 100} kg`
 const D = (s) => fmtDate(s, { day: 'numeric', month: 'short' })
 
-export async function buildStockPdf({ products, from, to, data }) {
+export async function buildStockPdf({ products, from, to, data, title = 'STOCK REPORT - DATE WISE', by = '' }) {
   const [{ jsPDF }, atMod] = await Promise.all([import('jspdf'), import('jspdf-autotable')])
   const autoTable = atMod.default
   const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' })
@@ -14,6 +14,47 @@ export async function buildStockPdf({ products, from, to, data }) {
   const M = 12
   const company = data.settings.company || 'Agenic'
   let first = true
+  if (products.length > 1) {
+    first = false
+    doc.setFillColor(...COL.brand)
+    doc.rect(0, 0, W, 26, 'F')
+    doc.setTextColor(255, 255, 255)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(18)
+    doc.text(company, M, 12)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9)
+    doc.text(`${title}${by ? `  |  Prepared by ${by}` : ''}`, M, 19)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(12)
+    doc.text('All products summary', W - M, 12, { align: 'right' })
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9)
+    doc.text(`${D(from)} to ${D(to)}`, W - M, 19, { align: 'right' })
+    const body = products.map((p) => {
+      const r = stockSummaryRange(p, from, to, data)
+      const made = sum(r, (d) => d.produced)
+      const sent = sum(r, (d) => d.dispatched)
+      const waste = sum(r, (d) => d.waste)
+      const now = dayStock(p, to, data)
+      return [p.name, kg(made), kg(sent), kg(waste), made ? `${((waste / made) * 100).toFixed(1)}%` : '-', kg(now.closing), p.packetKg ? packetText(now.closing, p) : '-']
+    })
+    autoTable(doc, {
+      startY: 34,
+      margin: { left: M, right: M, top: M },
+      theme: 'grid',
+      head: [['Product', 'Produced', 'Dispatched', 'Wasted', 'Wastage', `In hand on ${D(to)}`, 'Packets in hand']],
+      body,
+      styles: { fontSize: 10, cellPadding: 3, lineColor: [225, 228, 238], lineWidth: 0.2, textColor: COL.ink },
+      headStyles: { fillColor: COL.brand, textColor: 255 },
+      alternateRowStyles: { fillColor: [250, 250, 253] },
+      columnStyles: Object.fromEntries([1, 2, 3, 4, 5, 6].map((i) => [i, { halign: 'right' }])),
+      didParseCell: (h) => {
+        if (h.section === 'body' && h.column.index === 3 && !String(h.cell.raw).startsWith('0 ')) h.cell.styles.textColor = COL.neg
+        if (h.section === 'body' && h.column.index === 5) h.cell.styles.fontStyle = 'bold'
+      }
+    })
+  }
   for (const p of products) {
     const rows = stockSummaryRange(p, from, to, data)
     if (!first) doc.addPage()
@@ -26,7 +67,7 @@ export async function buildStockPdf({ products, from, to, data }) {
     doc.text(company, M, 12)
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(9)
-    doc.text('STOCK REPORT - DATE WISE', M, 19)
+    doc.text(`${title}${by ? `  |  Prepared by ${by}` : ''}`, M, 19)
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(12)
     doc.text(p.name, W - M, 12, { align: 'right' })

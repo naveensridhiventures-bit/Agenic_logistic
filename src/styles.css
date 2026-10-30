@@ -597,3 +597,4 @@ tfoot td { font-weight: 800; border-top: 2px solid var(--stroke); }
 .stk-bar i.m { background: #7c5cff; } .stk-bar i.s { background: #22d3ee; }
 .stk-bar small { position: absolute; bottom: 0; font-size: 10px; color: var(--muted); }
 .chip-btn.dashed { border-style: dashed; color: var(--muted); }
+.rep-sel { padding: 8px 10px; border-radius: 12px; }

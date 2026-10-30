@@ -428,6 +428,7 @@ function Home({ st }) {
           </button>
         ))}
       </div>
+      <ReportCard st={st} products={products} say={say} />
       <AnimatePresence>{toast && <motion.div className="d-toast" initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 30, opacity: 0 }}>{toast}</motion.div>}</AnimatePresence>
     </div>
   )
@@ -443,6 +444,57 @@ function Header({ st }) {
       <div className="d-head-r">
         <span className={cx('d-sync', (!st.online || st.qlen > 0) && 'off')}>{!st.online ? 'Offline' : st.qlen ? `Sending ${st.qlen}…` : 'Synced'}</span>
         <button className="d-link" onClick={() => confirm('Log out?') && st.logout()}>Log out</button>
+      </div>
+    </div>
+  )
+}
+
+function ReportCard({ st, products, say }) {
+  const { data } = st
+  const today = data.today
+  const [mode, setMode] = useState('today')
+  const [cf, setCf] = useState(addDays(today, -6))
+  const [ct, setCt] = useState(today)
+  const [busy, setBusy] = useState('')
+  const dow = (new Date(today + 'T00:00:00').getDay() + 6) % 7
+  const minD = addDays(today, -59)
+  const range = mode === 'today' ? { from: today, to: today, label: 'Today' } : mode === 'week' ? { from: addDays(today, -dow), to: today, label: 'This week' } : mode === 'last7' ? { from: addDays(today, -6), to: today, label: 'Last 7 days' } : { from: cf < minD ? minD : cf, to: ct, label: 'Custom' }
+  const run = async (share) => {
+    if (range.from > range.to) return say('From date must be before To date')
+    setBusy(share ? 'share' : 'pdf')
+    try {
+      const [{ buildStockPdf }, { sharePdf }] = await Promise.all([import('../lib/stockPdf'), import('../lib/report')])
+      const { doc, filename } = await buildStockPdf({ products, from: range.from, to: range.to, data: { ...data, settings: { company: data.company } }, title: `STOCK REPORT - ${range.label.toUpperCase()}`, by: 'Stock in-charge' })
+      if (share) {
+        const r = await sharePdf(doc, filename, `Stock report ${range.from} to ${range.to}`)
+        if (r === 'downloaded') say('Sharing not supported here - PDF downloaded')
+      } else {
+        doc.save(filename)
+        say('Report downloaded')
+      }
+    } catch (e) {
+      say(e.message)
+    }
+    setBusy('')
+  }
+  return (
+    <div className="sk-card">
+      <h3>Report for management</h3>
+      <div className="sk-seg wide">
+        {[['today', 'Today'], ['week', 'This week'], ['last7', '7 days'], ['custom', 'Custom']].map(([k, t]) => (
+          <button key={k} className={cx(mode === k && 'on')} onClick={() => setMode(k)}>{t}</button>
+        ))}
+      </div>
+      {mode === 'custom' && (
+        <div className="sk-dates">
+          <label>From<input type="date" value={cf} min={minD} max={today} onChange={(e) => setCf(e.target.value)} /></label>
+          <label>To<input type="date" value={ct} min={minD} max={today} onChange={(e) => setCt(e.target.value)} /></label>
+        </div>
+      )}
+      <p>{fmtDate(range.from, { day: 'numeric', month: 'short' })}{range.from !== range.to ? ` to ${fmtDate(range.to, { day: 'numeric', month: 'short', year: 'numeric' })}` : ` ${new Date(range.from + 'T00:00:00').getFullYear()}`} · all products, with date-wise made, sent, waste and balance</p>
+      <div className="sk-btns">
+        <button className="sk-save" disabled={!!busy} onClick={() => run(false)}>{busy === 'pdf' ? 'Creating…' : 'Download PDF'}</button>
+        <button className="sk-save alt" disabled={!!busy} onClick={() => run(true)}>{busy === 'share' ? '…' : 'Share'}</button>
       </div>
     </div>
   )
